@@ -1,21 +1,22 @@
-// lib/screens/profile/profile_screen.dart
-
 import 'dart:io';
 import 'package:animated_theme_switcher/animated_theme_switcher.dart';
-import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:charmy_craft_studio/core/app_theme.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/screens/auth/login_screen.dart';
+import 'package:charmy_craft_studio/screens/creator/create_order_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/creator_uploads_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/manage_categories_screen.dart';
+import 'package:charmy_craft_studio/screens/creator/manage_orders_screen.dart';
+import 'package:charmy_craft_studio/screens/creator/upload_product_screen.dart';
+import 'package:charmy_craft_studio/screens/profile/my_orders_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/select_avatar_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/widgets/settings_card.dart';
 import 'package:charmy_craft_studio/screens/upload/upload_artwork_screen.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
+import 'package:charmy_craft_studio/state/create_order_provider.dart';
+import 'package:charmy_craft_studio/state/creator_profile_provider.dart';
 import 'package:charmy_craft_studio/state/profile_update_provider.dart';
-import 'package:charmy_craft_studio/state/theme_provider.dart';
 import 'package:charmy_craft_studio/state/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -25,21 +26,10 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:widget_circular_animator/widget_circular_animator.dart';
 
-void showAuthModal(BuildContext context) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
-}
-
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  Future<void> _showChangePictureOptions(BuildContext context, WidgetRef ref, String userRole) async {
-    if (userRole != 'creator') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only creators can set a public profile picture.')),
-      );
-      return;
-    }
-
+  Future<void> _showChangePictureOptions(BuildContext context, WidgetRef ref) async {
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -66,12 +56,12 @@ class ProfileScreen extends ConsumerWidget {
                             toolbarTitle: 'Crop Picture',
                             toolbarColor: Theme.of(context).colorScheme.secondary,
                             toolbarWidgetColor: Colors.white,
-                            lockAspectRatio: false,
+                            lockAspectRatio: true,
                             cropStyle: CropStyle.circle,
                           ),
                           IOSUiSettings(
                             title: 'Crop Picture',
-                            aspectRatioLockEnabled: false,
+                            aspectRatioLockEnabled: true,
                             cropStyle: CropStyle.circle,
                             resetAspectRatioEnabled: true,
                           ),
@@ -84,7 +74,9 @@ class ProfileScreen extends ConsumerWidget {
                       }
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to process image: $e')));
+                    if(context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to process image: $e')));
+                    }
                   }
                 },
               ),
@@ -138,6 +130,16 @@ class ProfileScreen extends ConsumerWidget {
                       try {
                         final newName = nameController.text.trim();
                         await ref.read(authServiceProvider).updateUserDisplayName(newName);
+                        await ref.read(firestoreServiceProvider).updateUserDisplayName(user.uid, newName);
+
+                        // ** THE FIX IS HERE **
+                        // These lines tell the app to get fresh data for the user profile
+                        // and also to reset the "Create New Order" screen.
+                        ref.invalidate(userDataProvider);
+                        ref.invalidate(creatorProfileProvider);
+                        ref.invalidate(createOrderProvider);
+
+
                         if (context.mounted) Navigator.of(context).pop();
                       } catch (e) {
                         if (context.mounted) {
@@ -199,7 +201,7 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       child: const Text('Sign In / Sign Up'),
                       onPressed: () {
-                        showAuthModal(context);
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
                       },
                     ),
                   ],
@@ -215,7 +217,7 @@ class ProfileScreen extends ConsumerWidget {
                   Column(
                     children: [
                       GestureDetector(
-                        onTap: () => _showChangePictureOptions(context, ref, userRole),
+                        onTap: () => _showChangePictureOptions(context, ref),
                         child: WidgetCircularAnimator(
                           size: 150,
                           innerColor: theme.colorScheme.secondary,
@@ -288,43 +290,25 @@ class ProfileScreen extends ConsumerWidget {
                             padding: const EdgeInsets.all(16.0),
                             child: Column(
                               children: [
-                                // FIX: Commenting out the theme switcher UI for now
-                                // Row(
-                                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                //   children: [
-                                //     Text('Theme', style: theme.textTheme.titleMedium),
-                                //     ThemeSwitcher(
-                                //       builder: (context) {
-                                //         final themeNotifier = ref.read(themeProvider.notifier);
-                                //         final currentTheme = ref.watch(themeProvider);
-                                //         return AnimatedToggleSwitch<ThemeMode>.rolling(
-                                //           current: currentTheme,
-                                //           values: const [ThemeMode.light, ThemeMode.system, ThemeMode.dark],
-                                //           onChanged: (newTheme) {
-                                //             themeNotifier.setTheme(newTheme);
-                                //             final brightness = MediaQuery.of(context).platformBrightness;
-                                //             final isDark = newTheme == ThemeMode.dark || (newTheme == ThemeMode.system && brightness == Brightness.dark);
-                                //             ThemeSwitcher.of(context).changeTheme(
-                                //               theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
-                                //             );
-                                //           },
-                                //           iconBuilder: (value, foreground) {
-                                //             IconData data;
-                                //             switch (value) {
-                                //               case ThemeMode.light: data = Icons.wb_sunny_outlined; break;
-                                //               case ThemeMode.system: data = Icons.phone_iphone_outlined; break;
-                                //               case ThemeMode.dark: data = Icons.nightlight_outlined; break;
-                                //             }
-                                //             return Icon(data, color: foreground ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color, size: 18);
-                                //           },
-                                //           style: ToggleStyle(borderColor: Colors.transparent, indicatorColor: theme.cardColor, backgroundColor: theme.scaffoldBackgroundColor),
-                                //         );
-                                //       },
-                                //     )
-                                //   ],
-                                // ),
-                                // const Divider(height: 24),
                                 if (userRole == 'creator') ...[
+                                  SettingsCard(
+                                    icon: Icons.receipt_long_outlined,
+                                    title: 'Manage All Orders',
+                                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManageOrdersScreen())),
+                                  ),
+                                  const Divider(height: 1),
+                                  SettingsCard(
+                                    icon: Icons.add_box_outlined,
+                                    title: 'Create New Order',
+                                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateOrderScreen())),
+                                  ),
+                                  const Divider(height: 1),
+                                  SettingsCard(
+                                    icon: Icons.add_shopping_cart,
+                                    title: 'Add New Product',
+                                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadProductScreen())),
+                                  ),
+                                  const Divider(height: 1),
                                   SettingsCard(
                                     icon: Icons.upload_file_outlined,
                                     title: 'Upload New Artwork',
@@ -344,7 +328,13 @@ class ProfileScreen extends ConsumerWidget {
                                   ),
                                   const Divider(height: 24),
                                 ],
-                                SettingsCard(icon: Icons.shopping_bag_outlined, title: 'My Orders', onTap: () {}),
+                                SettingsCard(
+                                    icon: Icons.shopping_bag_outlined,
+                                    title: 'My Orders',
+                                    onTap: () {
+                                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyOrdersScreen()));
+                                    }
+                                ),
                               ],
                             ),
                           ),

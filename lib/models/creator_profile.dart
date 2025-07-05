@@ -29,12 +29,14 @@ class CreatorProfile {
   final String photoUrl;
   final String aboutMe;
   final List<SocialLink> socialLinks;
+  final String whatsappNumber;
 
   CreatorProfile({
     required this.displayName,
     required this.photoUrl,
     required this.aboutMe,
     required this.socialLinks,
+    required this.whatsappNumber,
   });
 
   factory CreatorProfile.fromFirestore(DocumentSnapshot doc) {
@@ -45,11 +47,12 @@ class CreatorProfile {
         .toList();
 
     return CreatorProfile(
-      // NEW: Read from the document
       displayName: data['displayName'] ?? 'Charmy Craft',
       photoUrl: data['photoUrl'] ?? '',
       aboutMe: data['aboutMe'] ?? 'About me section...',
       socialLinks: links,
+      // ** ADD THIS LINE (with a default number) **
+      whatsappNumber: data['whatsappNumber'] ?? '+910000000000',
     );
   }
 }

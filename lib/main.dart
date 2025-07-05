@@ -3,14 +3,11 @@
 import 'package:animated_theme_switcher/animated_theme_switcher.dart';
 import 'package:charmy_craft_studio/core/app_theme.dart';
 import 'package:charmy_craft_studio/firebase_options.dart';
-import 'package:charmy_craft_studio/services/auth_service.dart';
-import 'package:charmy_craft_studio/state/theme_provider.dart';
 import 'package:charmy_craft_studio/widgets/animated_nav_bar.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -20,14 +17,18 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // We are turning off App Check enforcement for testing with friends.
-  // try {
-  //   await FirebaseAppCheck.instance.activate(
-  //     androidProvider: kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
-  //   );
-  // } catch (e) {
-  //   print('⚠️ App Check initialization error: $e');
-  // }
+  // FIX: Re-enabled App Check with SafetyNet for reliable testing
+  try {
+    await FirebaseAppCheck.instance.activate(
+      // For a release build on the Play Store, this uses Play Integrity.
+      // For a debug build, this now uses SafetyNet.
+      androidProvider: kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.safetyNet,
+    );
+    print('Firebase App Check activated successfully.');
+  } catch (e) {
+    print('⚠️ App Check initialization error: $e');
+  }
+
 
   await MobileAds.instance.initialize();
 
@@ -43,12 +44,7 @@ class CharmyCraftStudio extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // final themeMode = ref.watch(themeProvider);
-    // final brightness = SchedulerBinding.instance.window.platformBrightness;
-    // final isDarkMode = themeMode == ThemeMode.dark || (themeMode == ThemeMode.system && brightness == Brightness.dark);
-    // final initialTheme = isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme;
-
-    // FIX: Forcing light theme for now.
+    // Forcing light theme for now as previously requested.
     final initialTheme = AppTheme.lightTheme;
 
 
@@ -57,7 +53,6 @@ class CharmyCraftStudio extends ConsumerWidget {
       builder: (context, myTheme) {
         return MaterialApp(
           title: 'Charmy Craft Studio',
-          // FIX: The theme and darkTheme properties are set to always use the light theme.
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.lightTheme,
           themeMode: ThemeMode.light,

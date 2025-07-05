@@ -1,12 +1,21 @@
-// lib/services/firestore_service.dart
-
+import 'package:charmy_craft_studio/models/address.dart';
 import 'package:charmy_craft_studio/models/artwork.dart';
 import 'package:charmy_craft_studio/models/creator_profile.dart';
+import 'package:charmy_craft_studio/models/order.dart' as my_order;
+import 'package:charmy_craft_studio/models/product.dart';
+import 'package:charmy_craft_studio/models/product_review.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/services/storage_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// A simple class to hold the current user's review for editing.
+class Review {
+  final double rating;
+  final String? text;
+  Review({required this.rating, this.text});
+}
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -19,6 +28,19 @@ class FirestoreService {
     final docSnap = await _db.collection('users').doc(uid).get();
     if (docSnap.exists) {
       return UserModel.fromFirestore(docSnap);
+    }
+    return null;
+  }
+
+  Future<UserModel?> getUserByEmail(String email) async {
+    final querySnapshot = await _db
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return UserModel.fromFirestore(querySnapshot.docs.first);
     }
     return null;
   }
@@ -42,8 +64,15 @@ class FirestoreService {
 
   Future<void> updateUserDisplayName(String uid, String newName) async {
     try {
-      await _db.collection('users').doc(uid).update({'displayName': newName});
-      await updateCreatorProfileDetails({'displayName': newName});
+      final userDocRef = _db.collection('users').doc(uid);
+      await userDocRef.update({'displayName': newName});
+
+      final userDoc = await userDocRef.get();
+      final userRole = (userDoc.data() as Map<String, dynamic>)['role'];
+
+      if (userRole == 'creator') {
+        await updateCreatorProfileDetails({'displayName': newName});
+      }
     } catch (e) {
       throw Exception('Error updating display name in Firestore: $e');
     }
@@ -55,6 +84,63 @@ class FirestoreService {
     } catch (e) {
       throw Exception('Error updating photo URL in Firestore: $e');
     }
+  }
+
+  // --- Product Methods ---
+  Stream<List<Product>> getProducts() {
+    return _db
+        .collection('products')
+        .orderBy('title')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) =>
+        Product.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList());
+  }
+
+  Future<Product?> getProductById(String productId) async {
+    final docSnap = await _db.collection('products').doc(productId).get();
+    if (docSnap.exists) {
+      return Product.fromFirestore(docSnap as DocumentSnapshot<Map<String, dynamic>>);
+    }
+    return null;
+  }
+
+  Future<List<Product>> searchProductsByTitle(String query) async {
+    if (query.isEmpty) {
+      return [];
+    }
+    final querySnapshot = await _db
+        .collection('products')
+        .where('title', isGreaterThanOrEqualTo: query)
+        .where('title', isLessThanOrEqualTo: query + '\uf8ff')
+        .limit(10)
+        .get();
+
+    return querySnapshot.docs
+        .map((doc) => Product.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList();
+  }
+
+  Stream<Product> getProduct(String productId) {
+    return _db
+        .collection('products')
+        .doc(productId)
+        .snapshots()
+        .map((snapshot) => Product.fromFirestore(
+        snapshot as DocumentSnapshot<Map<String, dynamic>>));
+  }
+
+  Future<DocumentReference> addProduct(Product product) {
+    return _db.collection('products').add(product.toMap());
+  }
+
+  Future<void> updateProduct(Product product) {
+    return _db.collection('products').doc(product.id).update(product.toMap());
+  }
+
+  Future<void> deleteProduct(String productId) {
+    return _db.collection('products').doc(productId).delete();
   }
 
   // --- Artwork Methods ---
@@ -187,11 +273,22 @@ class FirestoreService {
           (doc) => doc.exists
           ? CreatorProfile.fromFirestore(doc)
           : CreatorProfile(
-        displayName: 'Charmy Craft',
-        photoUrl: '',
-        aboutMe: 'Tap edit to add your story!',
-        socialLinks: [],
+          displayName: 'Charmy Craft',
+          photoUrl: '',
+          aboutMe: 'Tap edit to add your story!',
+          socialLinks: [],
+          whatsappNumber: '+910000000000'
       ),
+    );
+  }
+
+  Future<void> updateWhatsappNumber(String newNumber) async {
+    await _db
+        .collection('creator_profile')
+        .doc('my_profile')
+        .set(
+      {'whatsappNumber': newNumber},
+      SetOptions(merge: true),
     );
   }
 
@@ -225,6 +322,124 @@ class FirestoreService {
         .collection('creator_profile')
         .doc('my_profile')
         .set(data, SetOptions(merge: true));
+  }
+
+  // --- Address Methods ---
+  Stream<List<Address>> getAddresses(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => Address.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList());
+  }
+
+  Future<void> addAddress(String userId, Address address) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .add(address.toMap());
+  }
+
+  Future<void> updateAddress(String userId, Address address) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .doc(address.id)
+        .update(address.toMap());
+  }
+
+  Future<void> deleteAddress(String userId, String addressId) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .doc(addressId)
+        .delete();
+  }
+
+  // --- Order Methods ---
+  Future<void> createOrder(my_order.Order order) async {
+    await _db.collection('orders').doc(order.id).set(order.toMap());
+  }
+
+  Stream<List<my_order.Order>> getAllOrders() {
+    return _db
+        .collection('orders')
+        .orderBy('orderPlacementDate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => my_order.Order.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList());
+  }
+
+  Stream<List<my_order.Order>> getMyOrders(String userId) {
+    return _db
+        .collection('orders')
+        .where('userId', isEqualTo: userId)
+        .orderBy('orderPlacementDate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => my_order.Order.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList());
+  }
+
+  Future<void> updateOrder(String orderId, Map<String, dynamic> data) async {
+    await _db.collection('orders').doc(orderId).update(data);
+  }
+
+  // --- Review Methods ---
+  Future<void> setReview(String productId, String userId, String userName, String userPhotoUrl, double rating, String text) async {
+    final reviewRef = _db.collection('products').doc(productId).collection('reviews').doc(userId);
+    await reviewRef.set({
+      'userName': userName,
+      'userPhotoUrl': userPhotoUrl,
+      'rating': rating,
+      'text': text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<ProductReview>> getReviewsForProduct(String productId) {
+    return _db
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => ProductReview.fromFirestore(doc)).toList());
+  }
+
+  Stream<Review?> getCurrentUserReview(String productId, String userId) {
+    return _db
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .doc(userId)
+        .snapshots()
+        .map((doc) {
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        return Review(
+          rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+          text: data['text'] as String?,
+        );
+      }
+      return null;
+    });
+  }
+
+  Future<void> deleteReview(String productId, String reviewId) async {
+    await _db
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .doc(reviewId)
+        .delete();
   }
 }
 

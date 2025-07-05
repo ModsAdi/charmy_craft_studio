@@ -1,1 +1,41 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"charmy-craft-studio2","appId":"1:534287578415:android:ff43cf2fcdf830088c5dda","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"charmy-craft-studio2","configurations":{"android":"1:534287578415:android:ff43cf2fcdf830088c5dda","ios":"1:534287578415:ios:43d25d2463dfa90f8c5dda","macos":"1:534287578415:ios:43d25d2463dfa90f8c5dda","web":"1:534287578415:web:47bff38ea41198a68c5dda","windows":"1:534287578415:web:99719b99ef8a9ecb8c5dda"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "charmy-craft-studio2",
+          "appId": "1:534287578415:android:ff43cf2fcdf830088c5dda",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "charmy-craft-studio2",
+          "configurations": {
+            "android": "1:534287578415:android:ff43cf2fcdf830088c5dda",
+            "ios": "1:534287578415:ios:43d25d2463dfa90f8c5dda",
+            "macos": "1:534287578415:ios:43d25d2463dfa90f8c5dda",
+            "web": "1:534287578415:web:47bff38ea41198a68c5dda",
+            "windows": "1:534287578415:web:99719b99ef8a9ecb8c5dda"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,3 @@
-// lib/screens/creator_profile/creator_profile_screen.dart
-
 import 'dart:io';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -69,23 +67,19 @@ class CreatorProfileScreen extends ConsumerWidget {
       if (pickedFile != null) {
         final cropper = ImageCropper();
 
-        // FIX: Using the correct syntax for your version of image_cropper
         final CroppedFile? croppedFile = await cropper.cropImage(
           sourcePath: pickedFile.path,
-          // All UI settings now go inside these objects
           uiSettings: [
             AndroidUiSettings(
               toolbarTitle: 'Crop Profile Picture',
               toolbarColor: Theme.of(context).colorScheme.secondary,
               toolbarWidgetColor: Colors.white,
               lockAspectRatio: true,
-              // The cropStyle is a property of AndroidUiSettings
               cropStyle: CropStyle.circle,
             ),
             IOSUiSettings(
               title: 'Crop Profile Picture',
               aspectRatioLockEnabled: true,
-              // The cropStyle is a property of IOSUiSettings
               cropStyle: CropStyle.circle,
             ),
           ],
@@ -282,18 +276,21 @@ class EditProfileSheet extends ConsumerStatefulWidget {
 
 class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
   late final TextEditingController _aboutMeController;
+  late final TextEditingController _whatsappController;
   late List<SocialLink> _links;
 
   @override
   void initState() {
     super.initState();
     _aboutMeController = TextEditingController(text: widget.profile.aboutMe);
+    _whatsappController = TextEditingController(text: widget.profile.whatsappNumber);
     _links = List<SocialLink>.from(widget.profile.socialLinks.map((link) => SocialLink(name: link.name, url: link.url, icon: link.icon)));
   }
 
   void _saveChanges() {
     final firestoreService = ref.read(firestoreServiceProvider);
     firestoreService.updateAboutMe(_aboutMeController.text);
+    firestoreService.updateWhatsappNumber(_whatsappController.text.trim());
     firestoreService.updateSocialLinks(_links);
     Navigator.of(context).pop();
   }
@@ -391,6 +388,16 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
             Text('Edit Profile', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 24),
             TextField(controller: _aboutMeController, maxLines: 5, decoration: const InputDecoration(labelText: 'About Me', border: OutlineInputBorder(), alignLabelWithHint: true)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _whatsappController,
+              decoration: const InputDecoration(
+                  labelText: 'WhatsApp Order Number',
+                  hintText: '+911234567890',
+                  border: OutlineInputBorder()
+              ),
+              keyboardType: TextInputType.phone,
+            ),
             const SizedBox(height: 24),
             const Text('Social Links', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const Divider(),

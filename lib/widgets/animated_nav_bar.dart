@@ -1,6 +1,6 @@
 // lib/widgets/animated_nav_bar.dart
 
-import 'package:charmy_craft_studio/screens/appointment/appointment_screen.dart';
+import 'package:charmy_craft_studio/screens/buy_the_vibe/buy_the_vibe_screen.dart'; // Import the new screen
 import 'package:charmy_craft_studio/screens/creator_profile/creator_profile_screen.dart';
 import 'package:charmy_craft_studio/screens/discover/discover_screen.dart';
 import 'package:charmy_craft_studio/screens/favorites/favorites_screen.dart';
@@ -23,15 +23,16 @@ class _AnimatedNavBarState extends State<AnimatedNavBar> {
   final List<Widget> _pages = [
     const DiscoverScreen(),
     const FavoritesScreen(),
-    const CreatorProfileScreen(), // REPLACED CartScreen
-    const AppointmentScreen(),
+    const CreatorProfileScreen(),
+    const BuyTheVibeScreen(), // USE THE NEW SCREEN
     const ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     final Color navBarColor = Theme.of(context).colorScheme.surface;
-    final Color navBarButtonBgColor = Theme.of(context).colorScheme.secondary.withOpacity(0.9);
+    final Color navBarButtonBgColor =
+    Theme.of(context).colorScheme.secondary.withOpacity(0.9);
     final IconThemeData iconTheme = Theme.of(context).iconTheme;
 
     return Scaffold(
@@ -41,12 +42,21 @@ class _AnimatedNavBarState extends State<AnimatedNavBar> {
         index: _pageIndex,
         height: 60.0,
         items: <Widget>[
-          Icon(Icons.home_outlined, size: 30, color: _pageIndex == 0 ? Colors.white : iconTheme.color),
-          Icon(Icons.favorite_outline, size: 30, color: _pageIndex == 1 ? Colors.white : iconTheme.color),
-          // Using a FontAwesome icon for better visual appeal
-          FaIcon(FontAwesomeIcons.palette, size: 26, color: _pageIndex == 2 ? Colors.white : iconTheme.color),
-          Icon(Icons.calendar_today_outlined, size: 30, color: _pageIndex == 3 ? Colors.white : iconTheme.color),
-          Icon(Icons.person_outline, size: 30, color: _pageIndex == 4 ? Colors.white : iconTheme.color),
+          Icon(Icons.home_outlined,
+              size: 30,
+              color: _pageIndex == 0 ? Colors.white : iconTheme.color),
+          Icon(Icons.favorite_outline,
+              size: 30,
+              color: _pageIndex == 1 ? Colors.white : iconTheme.color),
+          FaIcon(FontAwesomeIcons.palette,
+              size: 26,
+              color: _pageIndex == 2 ? Colors.white : iconTheme.color),
+          Icon(Icons.shopping_bag_outlined,
+              size: 30,
+              color: _pageIndex == 3 ? Colors.white : iconTheme.color),
+          Icon(Icons.person_outline,
+              size: 30,
+              color: _pageIndex == 4 ? Colors.white : iconTheme.color),
         ],
         color: navBarColor,
         buttonBackgroundColor: navBarButtonBgColor,

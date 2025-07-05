@@ -1,0 +1,69 @@
+// lib/models/order.dart
+
+import 'package:charmy_craft_studio/models/order_item.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class Order {
+  final String id;
+  final String userId;
+  final String userEmail;
+  final String userName;
+  final List<OrderItem> items;
+  final double totalValue;
+  final DateTime orderPlacementDate;
+  final DateTime? approximateDeliveryDate;
+  final String status; // e.g., "Confirmed", "Shipped", "Delivered"
+  final bool advancePaid;
+
+  Order({
+    required this.id,
+    required this.userId,
+    required this.userEmail,
+    required this.userName,
+    required this.items,
+    required this.totalValue,
+    required this.orderPlacementDate,
+    this.approximateDeliveryDate,
+    required this.status,
+    required this.advancePaid,
+  });
+
+  // Convert to a map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'userEmail': userEmail,
+      'userName': userName,
+      'items': items.map((item) => item.toMap()).toList(),
+      'totalValue': totalValue,
+      'orderPlacementDate': Timestamp.fromDate(orderPlacementDate),
+      'approximateDeliveryDate': approximateDeliveryDate != null
+          ? Timestamp.fromDate(approximateDeliveryDate!)
+          : null,
+      'status': status,
+      'advancePaid': advancePaid,
+    };
+  }
+
+  // Create from a Firestore document
+  factory Order.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
+    return Order(
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      userEmail: data['userEmail'] ?? '',
+      userName: data['userName'] ?? '',
+      items: (data['items'] as List<dynamic>? ?? [])
+          .map((itemData) =>
+          OrderItem.fromMap(itemData as Map<String, dynamic>))
+          .toList(),
+      totalValue: (data['totalValue'] ?? 0.0).toDouble(),
+      orderPlacementDate:
+      (data['orderPlacementDate'] as Timestamp).toDate(),
+      approximateDeliveryDate:
+      (data['approximateDeliveryDate'] as Timestamp?)?.toDate(),
+      status: data['status'] ?? 'Pending',
+      advancePaid: data['advancePaid'] ?? false,
+    );
+  }
+}

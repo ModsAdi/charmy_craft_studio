@@ -2,6 +2,7 @@
 
 import 'package:charmy_craft_studio/screens/auth/login_screen.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
+import 'package:charmy_craft_studio/state/user_provider.dart'; // Import user_provider
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +34,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     );
   }
 
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+
   void _signUp() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -48,17 +62,24 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       );
 
       if (!mounted) return;
+
       if (user == null) {
         _showErrorSnackbar('Could not create account. The email may already be in use.');
+        setState(() { _isLoading = false; });
       } else {
-        Navigator.of(context).pop();
+        // DEFINITIVE FIX: Invalidate providers to force a refresh
+        ref.invalidate(authStateChangesProvider);
+        ref.invalidate(userDataProvider);
+
+        _showSuccessSnackbar("Welcome! Your account has been created.");
+
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       _showErrorSnackbar('An error occurred: ${e.toString()}');
-    }
-
-    if (mounted) {
-      setState(() { _isLoading = false; });
+      if (mounted) {
+        setState(() { _isLoading = false; });
+      }
     }
   }
 
@@ -141,7 +162,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    // UI FIX: Wrapped button in a SizedBox to make it full-width
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
