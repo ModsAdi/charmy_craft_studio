@@ -1,40 +1,38 @@
-// lib/models/cart_item.dart
-
-import 'package:charmy_craft_studio/models/product.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CartItem {
-  final String productId;
+  final String id; // This will be the Product ID
   final String title;
-  final String imageUrl;
   final double price;
-  final int quantity;
+  final String imageUrl;
+  int quantity;
 
   CartItem({
-    required this.productId,
+    required this.id,
     required this.title,
-    required this.imageUrl,
     required this.price,
-    required this.quantity,
+    required this.imageUrl,
+    this.quantity = 1,
   });
 
-  // A factory to create a CartItem from a Product
-  factory CartItem.fromProduct(Product product) {
-    return CartItem(
-      productId: product.id,
-      title: product.title,
-      imageUrl: product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
-      price: product.discountedPrice ?? product.price,
-      quantity: 1,
-    );
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'price': price,
+      'imageUrl': imageUrl,
+      'quantity': quantity,
+    };
   }
 
-  CartItem copyWith({int? quantity}) {
+  factory CartItem.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
     return CartItem(
-      productId: productId,
-      title: title,
-      imageUrl: imageUrl,
-      price: price,
-      quantity: quantity ?? this.quantity,
+      id: data['id'] ?? '',
+      title: data['title'] ?? '',
+      price: (data['price'] as num?)?.toDouble() ?? 0.0,
+      imageUrl: data['imageUrl'] ?? '',
+      quantity: (data['quantity'] as num?)?.toInt() ?? 0,
     );
   }
 }

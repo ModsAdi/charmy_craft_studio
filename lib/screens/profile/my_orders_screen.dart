@@ -1,12 +1,20 @@
-// lib/screens/profile/my_orders_screen.dart
-
-import 'package:charmy_craft_studio/models/order.dart';
-import 'package:charmy_craft_studio/state/my_orders_provider.dart';
+import 'package:charmy_craft_studio/models/order.dart' as my_order;
+import 'package:charmy_craft_studio/screens/profile/user_order_details_screen.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/services/auth_service.dart';
+import 'package:charmy_craft_studio/services/firestore_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
+// Provider to fetch the current user's orders
+final myOrdersProvider = StreamProvider.autoDispose<List<my_order.Order>>((ref) {
+  final user = ref.watch(authStateChangesProvider).value;
+  if (user == null) {
+    return Stream.value([]);
+  }
+  return ref.read(firestoreServiceProvider).getMyOrders(user.uid);
+});
 
 class MyOrdersScreen extends ConsumerWidget {
   const MyOrdersScreen({super.key});
@@ -24,14 +32,35 @@ class MyOrdersScreen extends ConsumerWidget {
         error: (err, stack) => Center(child: Text('Error: $err')),
         data: (orders) {
           if (orders.isEmpty) {
-            return const Center(child: Text('You have no orders yet.'));
+            return const Center(
+              child: Text('You have not placed any orders yet.'),
+            );
           }
           return ListView.builder(
-            padding: const EdgeInsets.all(8),
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
-              return _buildOrderCard(context, order);
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  title: Text('Order #${order.id.substring(0, 6)}...'),
+                  subtitle: Text('Placed on: ${DateFormat.yMMMd().format(order.orderPlacementDate)}'),
+                  trailing: Chip(
+                    label: Text(order.status),
+                    backgroundColor: _getStatusColor(order.status).withOpacity(0.2),
+                    labelStyle: TextStyle(color: _getStatusColor(order.status)),
+                  ),
+                  // ++ THIS IS THE CHANGE ++
+                  // Makes each order tappable to see details
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UserOrderDetailsScreen(order: order),
+                      ),
+                    );
+                  },
+                ),
+              );
             },
           );
         },
@@ -39,92 +68,19 @@ class MyOrdersScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, Order order) {
-    final theme = Theme.of(context);
-    final firstItem = order.items.isNotEmpty ? order.items.first : null;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Order #${order.id.substring(0, 6)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Chip(
-                  label: Text(order.status, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  backgroundColor: _getStatusColor(order.status),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ],
-            ),
-            const Divider(),
-            if (firstItem != null)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: firstItem.imageUrl,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                title: Text(firstItem.title),
-                subtitle: order.items.length > 1
-                    ? Text('+ ${order.items.length - 1} other item(s)')
-                    : null,
-              ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Total:', style: TextStyle(color: Colors.grey)),
-                    Text('₹${order.totalValue.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Est. Delivery:', style: TextStyle(color: Colors.grey)),
-                    Text(
-                      order.approximateDeliveryDate != null
-                          ? DateFormat.yMMMd().format(order.approximateDeliveryDate!)
-                          : 'Not Confirmed',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // Helper to color-code the status chip
   Color _getStatusColor(String status) {
-    switch(status.toLowerCase()) {
-      case 'confirmed':
-        return Colors.blue.shade400;
-      case 'shipped':
-        return Colors.orange.shade400;
-      case 'delivered':
-        return Colors.green.shade400;
-      default: // Pending
-        return Colors.grey.shade500;
+    switch (status) {
+      case 'Shipped':
+        return Colors.blue;
+      case 'Delivered':
+        return Colors.green;
+      case 'Pending':
+        return Colors.orange;
+      case 'Confirmed':
+        return Colors.purple;
+      default:
+        return Colors.grey;
     }
   }
 }

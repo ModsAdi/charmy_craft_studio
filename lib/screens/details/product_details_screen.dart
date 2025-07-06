@@ -1,10 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:charmy_craft_studio/models/address.dart';
+import 'package:charmy_craft_studio/models/cart_item.dart'; // <-- ADD THIS IMPORT
 import 'package:charmy_craft_studio/models/product.dart';
 import 'package:charmy_craft_studio/models/product_review.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/screens/details/full_image_screen.dart';
+import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
-import 'package:charmy_craft_studio/state/cart_provider.dart';
+// import 'package:charmy_craft_studio/state/cart_provider.dart'; // <-- This is no longer needed here
 import 'package:charmy_craft_studio/state/creator_profile_provider.dart';
 import 'package:charmy_craft_studio/state/product_review_provider.dart';
 import 'package:charmy_craft_studio/state/reviews_list_provider.dart';
@@ -18,9 +21,22 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+final defaultAddressProvider = StreamProvider.autoDispose<Address?>((ref) {
+  final user = ref.watch(authStateChangesProvider).value;
+  if (user == null) {
+    return Stream.value(null);
+  }
+  return ref.read(firestoreServiceProvider).getAddresses(user.uid).map((addresses) {
+    try {
+      return addresses.firstWhere((address) => address.isDefault);
+    } catch (e) {
+      return addresses.isNotEmpty ? addresses.first : null;
+    }
+  });
+});
+
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final String productId;
-
   const ProductDetailsScreen({super.key, required this.productId});
 
   @override
@@ -36,6 +52,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   void _launchWhatsApp(Product product, UserModel? user) async {
     final creatorProfile = ref.read(creatorProfileProvider).value;
     final whatsappNumber = creatorProfile?.whatsappNumber ?? '+910000000000';
+    final defaultAddress = ref.read(defaultAddressProvider).value;
 
     final name = user?.displayName ?? 'Customer';
     final email = user?.email ?? 'N/A';
@@ -44,33 +61,45 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
         ? "🔻 Discounted Price: ₹${product.discountedPrice!.toStringAsFixed(0)} (${product.discountPercentage}% OFF)"
         : "";
 
+    String addressString = "📍 **Shipping Address:**\n";
+    if (defaultAddress != null) {
+      addressString += "${defaultAddress.fullName}\n";
+      addressString += "${defaultAddress.flatHouseNo}, ${defaultAddress.areaStreet}\n";
+      if (defaultAddress.landmark.isNotEmpty) {
+        addressString += "Landmark: ${defaultAddress.landmark}\n";
+      }
+      addressString += "${defaultAddress.townCity}, ${defaultAddress.state} ${defaultAddress.pincode}\n";
+      addressString += "Phone: ${defaultAddress.mobileNumber}";
+    } else {
+      addressString += "No address saved. Please add one in your profile.";
+    }
+
     final message = """
 Hello, I'd like to place an order.
 
-👤 Name: $name
-📧 Email: $email
-
-Product count: 1
-🆔 Product ID: ${product.id}
-📦 Product: ${product.title}
-💬 Description: ${product.description}
-💰 Price: ₹${product.price.toStringAsFixed(0)}
+👤 **Name:** $name
+📧 **Email:** $email
+---
+🛍️ **Order Details**
+**Product ID:** ${product.id}
+**Product:** ${product.title}
+---
+💰 **Pricing**
+**Price:** ₹${product.price.toStringAsFixed(0)}
 $discountInfo
-📆 Delivery Time: ${product.deliveryTime}
-
-🔗 View Product: [We will add a link later]
-
-🧾 Total Order Value: ₹${price.toStringAsFixed(0)}
-
-Address - 
+**Delivery Time:** ${product.deliveryTime}
+---
+🧾 **Total Order Value: ₹${price.toStringAsFixed(0)}**
+---
+$addressString
 """;
 
     final url = Uri.parse("https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}");
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      throw 'Could not launch $url';
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch WhatsApp.')));
     }
   }
 
@@ -131,9 +160,7 @@ Address -
           final existingReview = userReviewAsync.value;
           if (_isFirstLoad && mounted) {
             _currentRating = existingReview?.rating ?? 0.0;
-            if (existingReview?.text != null) {
-              _reviewController.text = existingReview!.text!;
-            }
+            _reviewController.text = existingReview?.text ?? '';
             _isFirstLoad = false;
           }
 
@@ -272,12 +299,28 @@ Address -
       children: [
         Expanded(
           child: ElevatedButton(
+            // ++ THIS IS THE ONLY CHANGE IN THIS FILE ++
             onPressed: () {
-              ref.read(cartProvider.notifier).addItem(product);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Added to cart!')),
-              );
+              final currentUser = ref.read(authStateChangesProvider).value;
+              if (currentUser != null) {
+                final cartItem = CartItem(
+                  id: product.id,
+                  title: product.title,
+                  price: product.discountedPrice ?? product.price,
+                  imageUrl: product.imageUrls.first,
+                  quantity: 1,
+                );
+                ref.read(firestoreServiceProvider).addToCart(currentUser.uid, cartItem);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Added to cart!')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please log in to add items to your cart.')),
+                );
+              }
             },
+            // ++ END OF CHANGE ++
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -306,7 +349,7 @@ Address -
     );
   }
 
-  Widget _buildRatingSection(Product product, AsyncValue<Review?> userReviewAsync) {
+  Widget _buildRatingSection(Product product, AsyncValue<ProductReview?> userReviewAsync) {
     return Row(
       children: [
         RatingBar.builder(

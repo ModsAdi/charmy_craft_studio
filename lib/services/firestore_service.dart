@@ -1,5 +1,6 @@
 import 'package:charmy_craft_studio/models/address.dart';
 import 'package:charmy_craft_studio/models/artwork.dart';
+import 'package:charmy_craft_studio/models/cart_item.dart'; // <-- ADD THIS IMPORT
 import 'package:charmy_craft_studio/models/creator_profile.dart';
 import 'package:charmy_craft_studio/models/order.dart' as my_order;
 import 'package:charmy_craft_studio/models/product.dart';
@@ -9,13 +10,6 @@ import 'package:charmy_craft_studio/services/storage_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-// A simple class to hold the current user's review for editing.
-class Review {
-  final double rating;
-  final String? text;
-  Review({required this.rating, this.text});
-}
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -414,7 +408,7 @@ class FirestoreService {
         .map((snapshot) => snapshot.docs.map((doc) => ProductReview.fromFirestore(doc)).toList());
   }
 
-  Stream<Review?> getCurrentUserReview(String productId, String userId) {
+  Stream<ProductReview?> getCurrentUserReview(String productId, String userId) {
     return _db
         .collection('products')
         .doc(productId)
@@ -423,11 +417,7 @@ class FirestoreService {
         .snapshots()
         .map((doc) {
       if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        return Review(
-          rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
-          text: data['text'] as String?,
-        );
+        return ProductReview.fromFirestore(doc);
       }
       return null;
     });
@@ -440,6 +430,52 @@ class FirestoreService {
         .collection('reviews')
         .doc(reviewId)
         .delete();
+  }
+
+  // ++ NEW CART METHODS ++
+  Stream<List<CartItem>> getCartStream(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('cart')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => CartItem.fromFirestore(doc))
+        .toList());
+  }
+
+  Future<void> addToCart(String userId, CartItem item) async {
+    final cartRef = _db.collection('users').doc(userId).collection('cart').doc(item.id);
+    await cartRef.set(item.toMap(), SetOptions(merge: true));
+  }
+
+  Future<void> removeFromCart(String userId, String productId) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('cart')
+        .doc(productId)
+        .delete();
+  }
+
+  Future<void> updateCartItemQuantity(String userId, String productId, int newQuantity) async {
+    if (newQuantity < 1) {
+      await removeFromCart(userId, productId);
+    } else {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('cart')
+          .doc(productId)
+          .update({'quantity': newQuantity});
+    }
+  }
+
+  Future<void> clearCart(String userId) async {
+    final cartSnapshot = await _db.collection('users').doc(userId).collection('cart').get();
+    for (var doc in cartSnapshot.docs) {
+      await doc.reference.delete();
+    }
   }
 }
 

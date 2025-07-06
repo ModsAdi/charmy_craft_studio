@@ -1,5 +1,3 @@
-// lib/models/order_item.dart
-
 class OrderItem {
   final String productId;
   final String title;
@@ -34,6 +32,20 @@ class OrderItem {
       imageUrl: map['imageUrl'] ?? '',
       price: (map['price'] ?? 0.0).toDouble(),
       quantity: map['quantity'] ?? 0,
+    );
+  }
+
+  // ++ ADD THIS METHOD ++
+  // Allows creating a new instance with updated values.
+  OrderItem copyWith({
+    int? quantity,
+  }) {
+    return OrderItem(
+      productId: this.productId,
+      title: this.title,
+      imageUrl: this.imageUrl,
+      price: this.price,
+      quantity: quantity ?? this.quantity,
     );
   }
 }

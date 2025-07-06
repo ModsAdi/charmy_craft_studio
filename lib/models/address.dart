@@ -1,4 +1,3 @@
-// lib/models/address.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Address {
@@ -13,6 +12,7 @@ class Address {
   final String townCity;
   final String state;
   final bool isDefault;
+  final String? nickname; // ++ ADDED: Nickname for the address
 
   Address({
     this.id,
@@ -26,6 +26,7 @@ class Address {
     required this.townCity,
     required this.state,
     this.isDefault = false,
+    this.nickname, // ++ ADDED: To constructor
   });
 
   // Convert Address object to a Map for Firestore
@@ -41,6 +42,7 @@ class Address {
       'townCity': townCity,
       'state': state,
       'isDefault': isDefault,
+      'nickname': nickname, // ++ ADDED: To map for Firestore
     };
   }
 
@@ -59,6 +61,7 @@ class Address {
       townCity: data['townCity'] ?? '',
       state: data['state'] ?? '',
       isDefault: data['isDefault'] ?? false,
+      nickname: data['nickname'], // ++ ADDED: From Firestore
     );
   }
 }

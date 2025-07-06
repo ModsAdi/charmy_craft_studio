@@ -5,7 +5,6 @@ import 'package:charmy_craft_studio/services/firestore_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 
-// Represents the state of our order creation screen
 @immutable
 class CreateOrderState {
   final UserModel? foundUser;
@@ -37,7 +36,6 @@ class CreateOrderState {
   }
 }
 
-// Manages the logic for the order creation process
 class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   final Ref _ref;
   CreateOrderNotifier(this._ref) : super(const CreateOrderState());
@@ -46,7 +44,7 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
     state = state.copyWith(isLoading: true, clearError: true);
     final firestore = _ref.read(firestoreServiceProvider);
     try {
-      final user = await firestore.getUserByEmail(email); // We'll add this method next
+      final user = await firestore.getUserByEmail(email);
       if (user != null) {
         state = state.copyWith(foundUser: user, isLoading: false);
       } else {
@@ -58,25 +56,14 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   }
 
   Future<void> addProductById(String productId) async {
-    state = state.copyWith(isLoading: true, clearError: true);
     final firestore = _ref.read(firestoreServiceProvider);
     try {
-      final product = await firestore.getProductById(productId); // We'll add this method next
+      final product = await firestore.getProductById(productId);
       if (product != null) {
-        // Check if product is already in the list
         final existingIndex = state.items.indexWhere((item) => item.productId == product.id);
         if (existingIndex != -1) {
-          // If it exists, increase quantity
-          final updatedItems = List<OrderItem>.from(state.items);
-          final existingItem = updatedItems[existingIndex];
-          updatedItems[existingIndex] = OrderItem(
-            productId: existingItem.productId,
-            title: existingItem.title,
-            imageUrl: existingItem.imageUrl,
-            price: existingItem.price,
-            quantity: existingItem.quantity + 1,
-          );
-          state = state.copyWith(items: updatedItems, isLoading: false);
+          // If item exists, increase quantity using the new method
+          updateItemQuantity(productId, state.items[existingIndex].quantity + 1);
         } else {
           // If new, add it to the list
           final newItem = OrderItem(
@@ -94,6 +81,25 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
     } catch(e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
+  }
+
+  // ++ NEW FUNCTION TO HANDLE QUANTITY CHANGES ++
+  void updateItemQuantity(String productId, int newQuantity) {
+    // If quantity is zero or less, remove the item
+    if (newQuantity < 1) {
+      removeItem(productId);
+      return;
+    }
+
+    // Otherwise, update the quantity of the specific item
+    final updatedItems = state.items.map((item) {
+      if (item.productId == productId) {
+        return item.copyWith(quantity: newQuantity);
+      }
+      return item;
+    }).toList();
+
+    state = state.copyWith(items: updatedItems);
   }
 
   void removeItem(String productId) {

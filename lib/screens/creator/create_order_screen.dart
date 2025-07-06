@@ -60,10 +60,42 @@ class _CreateOrderScreenState extends ConsumerState<CreateOrderScreen> {
     });
   }
 
+  Future<void> _selectDeliveryDate(BuildContext context) async {
+    final theme = Theme.of(context);
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _deliveryDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.colorScheme.secondary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.secondary,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (pickedDate != null) {
+      setState(() => _deliveryDate = pickedDate);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final orderState = ref.watch(createOrderProvider);
     final notifier = ref.read(createOrderProvider.notifier);
+    final theme = Theme.of(context);
+    final totalValue = orderState.items.fold<double>(0, (sum, item) => sum + (item.price * item.quantity));
 
     ref.listen<CreateOrderState>(createOrderProvider, (previous, next) {
       if (next.errorMessage != null) {
@@ -85,137 +117,242 @@ class _CreateOrderScreenState extends ConsumerState<CreateOrderScreen> {
           )
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
+      // ++ MODIFIED: Wrapped in a Column to show the total value bar ++
+      body: Column(
         children: [
-          // User Search Section
-          if (orderState.foundUser == null) ...[
-            Text('Step 1: Find Customer', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Row(
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(labelText: 'Customer Email', border: OutlineInputBorder()),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  icon: const Icon(Icons.search),
-                  onPressed: orderState.isLoading ? null : () {
-                    FocusScope.of(context).unfocus();
-                    notifier.findUserByEmail(_emailController.text.trim());
-                  },
-                ),
-              ],
-            ),
-          ] else ...[
-            // Display Found User
-            Card(
-              color: Colors.green.shade50,
-              child: ListTile(
-                title: Text(orderState.foundUser!.displayName ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(orderState.foundUser!.email),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => notifier.reset(),
-                ),
-              ),
-            ),
-          ],
-
-          const Divider(height: 32),
-
-          if (orderState.foundUser != null) ...[
-            Text('Step 2: Add Products by Title', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            // ** NEW AUTOCOMPLETE SEARCH BOX **
-            Autocomplete<Product>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text == '') {
-                  return const Iterable<Product>.empty();
-                }
-                return ref.read(firestoreServiceProvider).searchProductsByTitle(textEditingValue.text);
-              },
-              displayStringForOption: (Product option) => option.title,
-              onSelected: (Product selection) {
-                notifier.addProductById(selection.id);
-              },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: InputDecoration(
-                    labelText: 'Start typing product title...',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () {
-                        // This might not be needed if selection is mandatory
-                        // but can be used for UID pasting.
-                        onFieldSubmitted();
-                      },
+                _buildSectionCard(
+                  context,
+                  step: '1',
+                  title: 'Find Customer',
+                  child: orderState.foundUser == null
+                      ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(labelText: 'Customer Email', border: OutlineInputBorder()),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        icon: const Icon(Icons.search),
+                        onPressed: orderState.isLoading ? null : () {
+                          FocusScope.of(context).unfocus();
+                          notifier.findUserByEmail(_emailController.text.trim());
+                        },
+                        style: IconButton.styleFrom(backgroundColor: theme.colorScheme.secondary),
+                      ),
+                    ],
+                  )
+                      : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(orderState.foundUser!.displayName ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(orderState.foundUser!.email),
+                          ],
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => notifier.reset(),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-
-            ...orderState.items.map((item) => Card(
-              child: ListTile(
-                leading: CachedNetworkImage(imageUrl: item.imageUrl, width: 40, errorWidget: (c,u,e) => const Icon(Icons.hide_image)),
-                title: Text(item.title, overflow: TextOverflow.ellipsis),
-                subtitle: Text('Qty: ${item.quantity} - ₹${item.price.toStringAsFixed(0)}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                  onPressed: () => notifier.removeItem(item.productId),
                 ),
-              ),
-            )),
 
-            const Divider(height: 32),
+                if (orderState.foundUser != null)
+                  _buildSectionCard(
+                    context,
+                    step: '2',
+                    title: 'Add Products',
+                    child: Column(
+                      children: [
+                        Autocomplete<Product>(
+                          optionsBuilder: (TextEditingValue textEditingValue) {
+                            if (textEditingValue.text == '') {
+                              return const Iterable<Product>.empty();
+                            }
+                            return ref.read(firestoreServiceProvider).searchProductsByTitle(textEditingValue.text);
+                          },
+                          displayStringForOption: (Product option) => option.title,
+                          onSelected: (Product selection) {
+                            notifier.addProductById(selection.id);
+                            // Clear the text field by rebuilding the Autocomplete widget
+                            setState(() {});
+                            FocusScope.of(context).unfocus();
+                          },
+                          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                            return TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              decoration: InputDecoration(
+                                labelText: 'Start typing product title...',
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  onPressed: () { controller.clear(); },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        ...orderState.items.map((item) => Card(
+                          elevation: 0,
+                          color: Colors.grey.shade100,
+                          child: ListTile(
+                            leading: CachedNetworkImage(imageUrl: item.imageUrl, width: 40, errorWidget: (c, u, e) => const Icon(Icons.hide_image)),
+                            title: Text(item.title, overflow: TextOverflow.ellipsis),
+                            subtitle: Text('₹${item.price.toStringAsFixed(0)}'),
+                            // ++ MODIFIED: This is now a Row with quantity controls ++
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  onPressed: () => notifier.updateItemQuantity(item.productId, item.quantity - 1),
+                                  splashRadius: 20,
+                                ),
+                                Text(item.quantity.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  onPressed: () => notifier.updateItemQuantity(item.productId, item.quantity + 1),
+                                  splashRadius: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
 
-            Text('Step 3: Finalize Details', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            ListTile(
-              title: const Text('Approximate Delivery Date'),
-              subtitle: Text(_deliveryDate == null ? 'Not Set' : DateFormat.yMMMd().format(_deliveryDate!)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: _deliveryDate ?? DateTime.now(),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)));
-                if(pickedDate != null) {
-                  setState(() => _deliveryDate = pickedDate);
-                }
-              },
+                if (orderState.foundUser != null)
+                  _buildSectionCard(
+                    context,
+                    step: '3',
+                    title: 'Finalize Details',
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.calendar_today_outlined),
+                          title: const Text('Approximate Delivery Date'),
+                          subtitle: Text(_deliveryDate == null ? 'Not Set' : DateFormat.yMMMd().format(_deliveryDate!)),
+                          onTap: () => _selectDeliveryDate(context),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Advance Payment Received'),
+                          secondary: const Icon(Icons.payment_outlined),
+                          value: _advancePaid,
+                          onChanged: (value) => setState(() => _advancePaid = value),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 32),
+
+                // Create Order Button is now inside the bottom bar
+              ],
             ),
-            SwitchListTile(
-              title: const Text('Advance Payment Received'),
-              value: _advancePaid,
-              onChanged: (value) => setState(() => _advancePaid = value),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-
-          if (orderState.foundUser != null && orderState.items.isNotEmpty)
-            ElevatedButton.icon(
-              icon: const Icon(Icons.done_all),
-              label: const Text('Create Order'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              ),
-              onPressed: _createOrder,
-            ),
+          ),
+          // ++ NEW: Checkout bar at the bottom ++
+          if (orderState.items.isNotEmpty)
+            _buildCheckoutBar(context, totalValue, _createOrder),
         ],
       ),
     );
   }
+
+  Widget _buildSectionCard(BuildContext context, {required String step, required String title, required Widget child}) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                  foregroundColor: Colors.white,
+                  child: Text(step, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 12),
+                Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(height: 24),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ++ NEW: Widget for the bottom bar ++
+Widget _buildCheckoutBar(BuildContext context, double total, VoidCallback onCreateOrder) {
+  final theme = Theme.of(context);
+  return Container(
+    padding: const EdgeInsets.all(16.0).copyWith(bottom: MediaQuery.of(context).padding.bottom + 8),
+    decoration: BoxDecoration(
+      color: theme.cardColor,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 10,
+          offset: const Offset(0, -5),
+        ),
+      ],
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Total Value', style: TextStyle(color: Colors.grey)),
+            Text(
+              '₹${total.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.done_all),
+          label: const Text('Create Order'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: theme.colorScheme.secondary,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: onCreateOrder,
+        ),
+      ],
+    ),
+  );
 }

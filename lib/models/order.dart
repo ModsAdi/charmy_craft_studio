@@ -1,5 +1,3 @@
-// lib/models/order.dart
-
 import 'package:charmy_craft_studio/models/order_item.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -12,8 +10,12 @@ class Order {
   final double totalValue;
   final DateTime orderPlacementDate;
   final DateTime? approximateDeliveryDate;
-  final String status; // e.g., "Confirmed", "Shipped", "Delivered"
+  final String status;
   final bool advancePaid;
+  final String? deliveryMode;
+  final String? specialNote;
+  final Map<String, dynamic>? trackingDetails;
+  final String? trackingLink; // ++ NEW FIELD FOR THE TRACKING URL ++
 
   Order({
     required this.id,
@@ -26,9 +28,12 @@ class Order {
     this.approximateDeliveryDate,
     required this.status,
     required this.advancePaid,
+    this.deliveryMode,
+    this.specialNote,
+    this.trackingDetails,
+    this.trackingLink, // ++ ADDED TO CONSTRUCTOR ++
   });
 
-  // Convert to a map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
@@ -42,10 +47,13 @@ class Order {
           : null,
       'status': status,
       'advancePaid': advancePaid,
+      'deliveryMode': deliveryMode,
+      'specialNote': specialNote,
+      'trackingDetails': trackingDetails,
+      'trackingLink': trackingLink, // ++ ADDED TO MAP ++
     };
   }
 
-  // Create from a Firestore document
   factory Order.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
     return Order(
@@ -64,6 +72,10 @@ class Order {
       (data['approximateDeliveryDate'] as Timestamp?)?.toDate(),
       status: data['status'] ?? 'Pending',
       advancePaid: data['advancePaid'] ?? false,
+      deliveryMode: data['deliveryMode'],
+      specialNote: data['specialNote'],
+      trackingDetails: data['trackingDetails'] != null ? Map<String, dynamic>.from(data['trackingDetails']) : null,
+      trackingLink: data['trackingLink'], // ++ ADDED FROM FIRESTORE ++
     );
   }
 }

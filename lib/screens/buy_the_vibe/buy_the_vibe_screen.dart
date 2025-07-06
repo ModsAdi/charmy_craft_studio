@@ -4,7 +4,6 @@ import 'package:charmy_craft_studio/state/cart_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// Make sure this is a ConsumerWidget to access the cart state
 class BuyTheVibeScreen extends ConsumerWidget {
   const BuyTheVibeScreen({super.key});
 
@@ -12,14 +11,20 @@ class BuyTheVibeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: Colors.blueGrey,
-      appBar: _buildAppBar(context, ref), // Pass ref to the AppBar
+      appBar: _buildAppBar(context, ref),
       body: const ProductsWidget(),
     );
   }
 
   AppBar _buildAppBar(BuildContext context, WidgetRef ref) {
-    // Watch the cart provider to get the number of items
-    final cartItemsCount = ref.watch(cartProvider.select((cart) => cart.length));
+    // ++ THIS IS THE ONLY CHANGE IN THIS FILE ++
+    // The new provider returns an AsyncValue, so we handle its states.
+    final cartItemsCount = ref.watch(cartProvider).when(
+      data: (items) => items.length,
+      loading: () => 0,
+      error: (err, stack) => 0,
+    );
+    // ++ END OF CHANGE ++
 
     return AppBar(
       elevation: 0,
@@ -27,8 +32,6 @@ class BuyTheVibeScreen extends ConsumerWidget {
       title: const Text('BUY THE VIBE'),
       centerTitle: true,
       actions: [
-        // ** THE FIX IS HERE **
-        // We wrap the cart icon button in a Stack to overlay the badge.
         Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
@@ -39,7 +42,6 @@ class BuyTheVibeScreen extends ConsumerWidget {
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CartScreen()));
               },
             ),
-            // This badge will only appear if there are items in the cart
             if (cartItemsCount > 0)
               Positioned(
                 top: 8,
