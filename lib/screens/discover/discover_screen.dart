@@ -111,7 +111,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                   );
                 }
                 return MasonryGridView.count(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  // ++ THIS IS THE FIX ++
+                  // Added more bottom padding to account for the nav bar
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   crossAxisCount: 2,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,

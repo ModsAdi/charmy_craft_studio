@@ -1,5 +1,3 @@
-// lib/screens/creator/manage_orders_screen.dart
-
 import 'package:charmy_craft_studio/models/order.dart';
 import 'package:charmy_craft_studio/screens/creator/fulfilled_orders_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/order_details_screen.dart';
@@ -70,7 +68,8 @@ class ManageOrdersScreen extends ConsumerWidget {
   }
 
   Widget _buildFilterChips(BuildContext context, WidgetRef ref) {
-    const statuses = ['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered'];
+    // ++ ADDED: 'Cancelled' to the filter options ++
+    const statuses = ['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
     final selectedStatus = ref.watch(statusFilterProvider);
 
     return Padding(
@@ -103,6 +102,22 @@ class ManageOrdersScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final userAsync = ref.watch(artistDetailsProvider(order.userId));
 
+    // ++ NEW: Color logic for all statuses ++
+    Color statusColor;
+    switch (order.status) {
+      case 'Confirmed':
+        statusColor = Colors.green;
+        break;
+      case 'Cancelled':
+        statusColor = Colors.red;
+        break;
+      case 'Shipped':
+        statusColor = Colors.blue;
+        break;
+      default:
+        statusColor = theme.colorScheme.secondary;
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
@@ -116,8 +131,8 @@ class ManageOrdersScreen extends ConsumerWidget {
             subtitle: Text('Total: ₹${order.totalValue.toStringAsFixed(0)} - ${DateFormat.yMMMd().format(order.orderPlacementDate)}'),
             trailing: Chip(
               label: Text(order.status),
-              backgroundColor: order.status == 'Confirmed' ? Colors.green.withOpacity(0.2) : theme.colorScheme.secondary.withOpacity(0.2),
-              labelStyle: TextStyle(color: order.status == 'Confirmed' ? Colors.green[800] : theme.colorScheme.secondary),
+              backgroundColor: statusColor.withOpacity(0.2),
+              labelStyle: TextStyle(color: statusColor.withOpacity(0.9)),
             ),
             onTap: () {
               Navigator.of(context).push(MaterialPageRoute(
@@ -125,8 +140,8 @@ class ManageOrdersScreen extends ConsumerWidget {
               ));
             },
           ),
-          // ++ NEW: Conditional "Fulfill" button ++
-          if (order.status == 'Delivered')
+          // ++ UPDATED: Fulfill button now shows for Cancelled orders as well ++
+          if (order.status == 'Delivered' || order.status == 'Cancelled')
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0, right: 8.0),
               child: Align(

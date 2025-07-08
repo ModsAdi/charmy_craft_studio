@@ -18,7 +18,16 @@ class Order {
   final String? specialNote;
   final Map<String, dynamic>? trackingDetails;
   final String? trackingLink;
-  final bool isFulfilled; // <-- NEW FIELD
+  final bool isFulfilled;
+
+  // ++ ADDED: A consistent list of statuses for dropdowns ++
+  static const List<String> statusOptions = [
+    'Pending',
+    'Confirmed',
+    'Shipped',
+    'Delivered',
+    'Cancelled'
+  ];
 
   Order({
     required this.id,
@@ -35,7 +44,7 @@ class Order {
     this.specialNote,
     this.trackingDetails,
     this.trackingLink,
-    this.isFulfilled = false, // <-- ADDED TO CONSTRUCTOR
+    this.isFulfilled = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -55,7 +64,7 @@ class Order {
       'specialNote': specialNote,
       'trackingDetails': trackingDetails,
       'trackingLink': trackingLink,
-      'isFulfilled': isFulfilled, // <-- ADDED TO MAP
+      'isFulfilled': isFulfilled,
     };
   }
 
@@ -82,7 +91,7 @@ class Order {
           ? Map<String, dynamic>.from(data['trackingDetails'])
           : null,
       trackingLink: data['trackingLink'],
-      isFulfilled: data['isFulfilled'] ?? false, // <-- ADDED FROM FIRESTORE
+      isFulfilled: data['isFulfilled'] ?? false,
     );
   }
 }

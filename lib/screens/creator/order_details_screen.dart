@@ -117,7 +117,46 @@ class _CreatorOrderDetailsScreenState
     }
   }
 
-  // ++ FIXED: Themed Date Picker Function ++
+  // ++ NEW: Logic to handle order cancellation ++
+  Future<void> _cancelOrder() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Cancellation'),
+        content: const Text('Are you sure you want to cancel this order? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Yes, Cancel Order', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isLoading = true);
+      try {
+        await ref.read(firestoreServiceProvider).cancelOrder(widget.order.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Order cancelled.'), backgroundColor: Colors.orange),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error cancelling order: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   Future<void> _selectDeliveryDate(BuildContext context) async {
     final theme = Theme.of(context);
     final pickedDate = await showDatePicker(
@@ -149,6 +188,9 @@ class _CreatorOrderDetailsScreenState
 
   @override
   Widget build(BuildContext context) {
+    // ++ NEW: Condition to check if the cancel button should be shown ++
+    bool canCancel = widget.order.status != 'Delivered' && widget.order.status != 'Cancelled';
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Order #${widget.order.id.substring(0, 6)}...'),
@@ -171,7 +213,21 @@ class _CreatorOrderDetailsScreenState
             child: _isLoading
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white,))
                 : const Text('Save Changes'),
-          )
+          ),
+          // ++ NEW: Cancel Order Button ++
+          if(canCancel) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancel This Order'),
+              onPressed: _isLoading ? null : _cancelOrder,
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 12)
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -200,7 +256,6 @@ class _CreatorOrderDetailsScreenState
     );
   }
 
-  // ++ FIXED: Item image overlapping bug by setting a fixed width ++
   Widget _buildOrderItems() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,10 +286,11 @@ class _CreatorOrderDetailsScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Update Status', style: GoogleFonts.lato(fontSize: 18, fontWeight: FontWeight.bold)),
+            // ++ UPDATED: Now uses the static list from the Order model ++
             DropdownButton<String>(
               value: _currentStatus,
               isExpanded: true,
-              items: ['Pending', 'Confirmed', 'Shipped', 'Delivered']
+              items: my_order.Order.statusOptions
                   .map((status) => DropdownMenuItem(value: status, child: Text(status)))
                   .toList(),
               onChanged: (value) {
@@ -263,7 +319,6 @@ class _CreatorOrderDetailsScreenState
     );
   }
 
-  // ++ UPDATED: Shipment details section with new fields ++
   Widget _buildShipmentDetailsCard() {
     return Card(
       child: Padding(

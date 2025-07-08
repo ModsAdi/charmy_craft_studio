@@ -1,7 +1,7 @@
 // lib/screens/profile/profile_screen.dart
 
 import 'dart:io';
-import 'package:animated_theme_switcher/animated_theme_switcher.dart';
+// REMOVED: No longer need animated_theme_switcher
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/screens/auth/login_screen.dart';
@@ -9,10 +9,12 @@ import 'package:charmy_craft_studio/screens/creator/create_order_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/creator_uploads_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/manage_categories_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/manage_orders_screen.dart';
-import 'package:charmy_craft_studio/screens/creator/manage_products_screen.dart'; // <-- NEW IMPORT
+import 'package:charmy_craft_studio/screens/creator/manage_products_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/upload_product_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/my_orders_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/select_avatar_screen.dart';
+import 'package:charmy_craft_studio/screens/profile/theme_color_screen.dart';
+import 'package:charmy_craft_studio/screens/profile/theme_mode_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/widgets/settings_card.dart';
 import 'package:charmy_craft_studio/screens/profile/your_addresses_screen.dart';
 import 'package:charmy_craft_studio/screens/upload/upload_artwork_screen.dart';
@@ -174,8 +176,9 @@ class ProfileScreen extends ConsumerWidget {
                           );
                         }
                       } finally {
-                        if (context.mounted)
+                        if (context.mounted) {
                           setDialogState(() => isSaving = false);
+                        }
                       }
                     }
                   },
@@ -206,254 +209,276 @@ class ProfileScreen extends ConsumerWidget {
       }
     });
 
-    return ThemeSwitchingArea(
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('My Profile',
-              style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: userData.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, stack) => Center(child: Text('Error: $err')),
-          data: (user) {
-            if (user == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("You're not signed in."),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 32, vertical: 12)),
-                      child: const Text('Sign In / Sign Up'),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const LoginScreen()));
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
+    // The ThemeSwitchingArea widget was removed from here
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('My Profile',
+            style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: userData.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error: $err')),
+        data: (user) {
+          if (user == null) {
+            return Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showChangePictureOptions(context, ref),
-                        child: WidgetCircularAnimator(
-                          size: 150,
-                          innerColor: theme.colorScheme.secondary,
-                          outerColor:
-                          theme.colorScheme.secondary.withOpacity(0.5),
-                          child: Center(
-                            child: isUploading
-                                ? const CircularProgressIndicator()
-                                : CircleAvatar(
-                              radius: 65,
-                              backgroundColor: theme.colorScheme.surface,
-                              child: user.photoUrl != null &&
-                                  user.photoUrl!.isNotEmpty
-                                  ? ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: user.photoUrl!,
-                                  fit: BoxFit.cover,
-                                  width: 130,
-                                  height: 130,
-                                  placeholder: (context, url) =>
-                                  const CircularProgressIndicator(),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                  const Icon(Icons.person,
-                                      size: 60),
-                                ),
-                              )
-                                  : Icon(Icons.person,
-                                  size: 60,
-                                  color:
-                                  theme.colorScheme.secondary),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            user.displayName ?? 'Charmy User',
-                            style: theme.textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.edit,
-                                size: 20, color: Colors.grey[600]),
-                            splashRadius: 20,
-                            onPressed: () =>
-                                _showEditNameDialog(context, ref, user),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(user.email,
-                          style: theme.textTheme.bodyLarge
-                              ?.copyWith(color: Colors.grey[600])),
-                      if (userRole == 'creator')
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Chip(
-                            label: const Text('Creator'),
-                            backgroundColor:
-                            theme.colorScheme.secondary.withOpacity(0.2),
-                            labelStyle:
-                            TextStyle(color: theme.colorScheme.secondary),
-                            side: BorderSide.none,
-                          ),
-                        ),
-                    ],
-                  ).animate().fadeIn(duration: 500.ms).slideY(
-                      begin: 0.2, curve: Curves.easeOut),
-                  const SizedBox(height: 32),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      children: [
-                        _buildSectionHeader('Settings'),
-                        const SizedBox(height: 8),
-                        Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: theme.dividerColor)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              children: [
-                                if (userRole == 'creator') ...[
-                                  SettingsCard(
-                                    icon: Icons.receipt_long_outlined,
-                                    title: 'Manage All Orders',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const ManageOrdersScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  SettingsCard(
-                                    icon: Icons.add_box_outlined,
-                                    title: 'Create New Order',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const CreateOrderScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  SettingsCard(
-                                    icon: Icons.add_shopping_cart,
-                                    title: 'Add New Product',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const UploadProductScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  // ++ NEW ++
-                                  SettingsCard(
-                                    icon: Icons.store_outlined,
-                                    title: 'Manage Products',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const ManageProductsScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  SettingsCard(
-                                    icon: Icons.upload_file_outlined,
-                                    title: 'Upload New Artwork',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const UploadArtworkScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  SettingsCard(
-                                    icon: Icons.collections_bookmark_outlined,
-                                    title: 'All Uploads',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const CreatorUploadsScreen())),
-                                  ),
-                                  const Divider(height: 1),
-                                  SettingsCard(
-                                    icon: Icons.category_outlined,
-                                    title: 'Manage Galleries',
-                                    onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                            const ManageCategoriesScreen())),
-                                  ),
-                                  const Divider(height: 24),
-                                ],
-                                SettingsCard(
-                                    icon: Icons.shopping_bag_outlined,
-                                    title: 'My Orders',
-                                    onTap: () {
-                                      Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                              builder: (_) =>
-                                              const MyOrdersScreen()));
-                                    }),
-                                const Divider(height: 1),
-                                SettingsCard(
-                                    icon: Icons.location_on_outlined,
-                                    title: 'Manage Your Addresses',
-                                    onTap: () {
-                                      Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                              builder: (_) =>
-                                              const YourAddressesScreen()));
-                                    }),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.logout),
-                            label: const Text('Logout'),
-                            onPressed: () =>
-                                ref.read(authServiceProvider).signOut(),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: Colors.redAccent,
-                              padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 100),
-                      ],
-                    ),
+                  const Text("You're not signed in."),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 12)),
+                    child: const Text('Sign In / Sign Up'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const LoginScreen()));
+                    },
                   ),
                 ],
               ),
             );
-          },
-        ),
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showChangePictureOptions(context, ref),
+                      child: WidgetCircularAnimator(
+                        size: 150,
+                        innerColor: theme.colorScheme.secondary,
+                        outerColor:
+                        theme.colorScheme.secondary.withOpacity(0.5),
+                        child: Center(
+                          child: isUploading
+                              ? const CircularProgressIndicator()
+                              : CircleAvatar(
+                            radius: 65,
+                            backgroundColor: theme.colorScheme.surface,
+                            child: user.photoUrl != null &&
+                                user.photoUrl!.isNotEmpty
+                                ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: user.photoUrl!,
+                                fit: BoxFit.cover,
+                                width: 130,
+                                height: 130,
+                                placeholder: (context, url) =>
+                                const CircularProgressIndicator(),
+                                errorWidget:
+                                    (context, url, error) =>
+                                const Icon(Icons.person,
+                                    size: 60),
+                              ),
+                            )
+                                : Icon(Icons.person,
+                                size: 60,
+                                color:
+                                theme.colorScheme.secondary),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          user.displayName ?? 'Charmy User',
+                          style: theme.textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.edit,
+                              size: 20, color: Colors.grey[600]),
+                          splashRadius: 20,
+                          onPressed: () =>
+                              _showEditNameDialog(context, ref, user),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(user.email,
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(color: Colors.grey[600])),
+                    if (userRole == 'creator')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Chip(
+                          label: const Text('Creator'),
+                          backgroundColor:
+                          theme.colorScheme.secondary.withOpacity(0.2),
+                          labelStyle:
+                          TextStyle(color: theme.colorScheme.secondary),
+                          side: BorderSide.none,
+                        ),
+                      ),
+                  ],
+                ).animate().fadeIn(duration: 500.ms).slideY(
+                    begin: 0.2, curve: Curves.easeOut),
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    children: [
+                      _buildSectionHeader('Settings'),
+                      const SizedBox(height: 8),
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(color: theme.dividerColor)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              if (userRole == 'creator') ...[
+                                SettingsCard(
+                                  icon: Icons.receipt_long_outlined,
+                                  title: 'Manage All Orders',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const ManageOrdersScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.add_box_outlined,
+                                  title: 'Create New Order',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const CreateOrderScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.add_shopping_cart,
+                                  title: 'Add New Product',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const UploadProductScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.store_outlined,
+                                  title: 'Manage Products',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const ManageProductsScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.upload_file_outlined,
+                                  title: 'Upload New Artwork',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const UploadArtworkScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.collections_bookmark_outlined,
+                                  title: 'All Uploads',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const CreatorUploadsScreen())),
+                                ),
+                                const Divider(height: 1),
+                                SettingsCard(
+                                  icon: Icons.category_outlined,
+                                  title: 'Manage Galleries',
+                                  onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                          const ManageCategoriesScreen())),
+                                ),
+                                const Divider(height: 24),
+                              ],
+
+                              SettingsCard(
+                                icon: Icons.palette_outlined,
+                                title: 'Theme Color',
+                                subtitle: 'Change the primary color of the app',
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const ThemeColorScreen()),
+                                  );
+                                },
+                              ),
+                              const Divider(height: 1),
+                              SettingsCard(
+                                icon: Icons.brightness_6_outlined,
+                                title: 'Appearance',
+                                subtitle: 'Choose between Light and Dark mode',
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const ThemeModeScreen()),
+                                  );
+                                },
+                              ),
+                              const Divider(height: 1),
+
+                              SettingsCard(
+                                  icon: Icons.shopping_bag_outlined,
+                                  title: 'My Orders',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                            const MyOrdersScreen()));
+                                  }),
+                              const Divider(height: 1),
+                              SettingsCard(
+                                  icon: Icons.location_on_outlined,
+                                  title: 'Manage Your Addresses',
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                            const YourAddressesScreen()));
+                                  }),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Logout'),
+                          onPressed: () =>
+                              ref.read(authServiceProvider).signOut(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.redAccent,
+                            padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -28,7 +28,7 @@ class UserOrderDetailsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          _buildStatusTracker(),
+          _buildStatusTracker(context), // Pass context
           const SizedBox(height: 24),
           _buildInfoCard(
             icon: Icons.receipt_long_outlined,
@@ -99,34 +99,80 @@ class UserOrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusTracker() {
-    final statuses = ['Confirmed', 'Shipped', 'Delivered'];
-    final currentStatusIndex = statuses.indexOf(order.status);
+  // ++ UPDATED WIDGET ++
+  Widget _buildStatusTracker(BuildContext context) {
+    // 1. Handle 'Cancelled' status separately for a clearer UI
+    if (order.status == 'Cancelled') {
+      return Card(
+        elevation: 4,
+        shadowColor: Colors.black.withOpacity(0.2),
+        color: Colors.red.shade50,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 28),
+              const SizedBox(width: 16),
+              Text(
+                'Order Cancelled',
+                style: GoogleFonts.lato(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 2. Correctly handle the linear progress for other statuses
+    final statuses = ['Pending', 'Confirmed', 'Shipped', 'Delivered'];
+    int currentStatusIndex = statuses.indexOf(order.status);
+    if (currentStatusIndex == -1) currentStatusIndex = 0;
 
     return Card(
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20.0),
+        padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 8.0),
         child: Row(
           children: List.generate(statuses.length, (index) {
-            final isCompleted = index <= currentStatusIndex;
+            // 3. Updated logic for completion and active state
+            final isCompleted = index < currentStatusIndex;
             final isActive = index == currentStatusIndex;
+
+            IconData iconData;
+            Color iconColor;
+
+            if (isCompleted) {
+              iconData = Icons.check_circle;
+              iconColor = Colors.green.shade600;
+            } else if (isActive) {
+              iconData = Icons.radio_button_checked;
+              iconColor = Theme.of(context).colorScheme.secondary;
+            } else {
+              iconData = Icons.radio_button_unchecked;
+              iconColor = Colors.grey.shade300;
+            }
 
             return Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: isCompleted ? Colors.green : Colors.grey.shade300,
-                    size: 28,
-                  ),
+                  Icon(iconData, color: iconColor, size: 28),
                   const SizedBox(height: 8),
                   Text(
                     statuses[index],
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                      color: isActive ? Colors.black : Colors.grey,
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                        color: isActive ? Colors.black : Colors.grey.shade600,
+                        fontSize: 13
                     ),
                   ),
                 ],
@@ -213,15 +259,5 @@ class UserOrderDetailsScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Shipped': return Colors.blue.shade700;
-      case 'Delivered': return Colors.green.shade700;
-      case 'Pending': return Colors.orange.shade700;
-      case 'Confirmed': return Colors.purple.shade700;
-      default: return Colors.grey.shade700;
-    }
   }
 }

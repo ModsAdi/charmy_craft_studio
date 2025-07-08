@@ -1,5 +1,5 @@
 import 'package:charmy_craft_studio/models/order.dart' as my_order;
-import 'package:charmy_craft_studio/screens/profile/user_order_details_screen.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/screens/profile/user_order_details_screen.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
 import 'package:flutter/material.dart';
@@ -50,8 +50,6 @@ class MyOrdersScreen extends ConsumerWidget {
                     backgroundColor: _getStatusColor(order.status).withOpacity(0.2),
                     labelStyle: TextStyle(color: _getStatusColor(order.status)),
                   ),
-                  // ++ THIS IS THE CHANGE ++
-                  // Makes each order tappable to see details
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -79,6 +77,9 @@ class MyOrdersScreen extends ConsumerWidget {
         return Colors.orange;
       case 'Confirmed':
         return Colors.purple;
+    // ++ ADDED: This makes the chip red for cancelled orders ++
+      case 'Cancelled':
+        return Colors.red;
       default:
         return Colors.grey;
     }

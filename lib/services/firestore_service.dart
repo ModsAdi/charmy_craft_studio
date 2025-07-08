@@ -130,16 +130,12 @@ class FirestoreService {
   Future<DocumentReference> addProduct(Product product) async {
     String newId;
     while (true) {
-      // Generate a random 7-digit number as a string
       newId = (Random().nextInt(9000000) + 1000000).toString();
       final doc = await _db.collection('products').doc(newId).get();
       if (!doc.exists) {
-        // If the ID is unique, break the loop
         break;
       }
     }
-
-    // Create the document with the new unique ID
     final docRef = _db.collection('products').doc(newId);
     await docRef.set(product.toMap());
     return docRef;
@@ -389,11 +385,10 @@ class FirestoreService {
     await _db.collection('orders').doc(order.id).set(order.toMap());
   }
 
-  // ++ MODIFIED: Now fetches only active, unfulfilled orders ++
   Stream<List<my_order.Order>> getAllOrders() {
     return _db
         .collection('orders')
-        .where('isFulfilled', isEqualTo: false) // <-- ADDED FILTER
+        .where('isFulfilled', isEqualTo: false)
         .orderBy('orderPlacementDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -402,7 +397,6 @@ class FirestoreService {
         .toList());
   }
 
-  // ++ NEW: Fetches only fulfilled orders ++
   Stream<List<my_order.Order>> getFulfilledOrders() {
     return _db
         .collection('orders')
@@ -415,7 +409,6 @@ class FirestoreService {
         .toList());
   }
 
-  // ++ NEW: Marks an order as fulfilled ++
   Future<void> fulfillOrder(String orderId) {
     return _db.collection('orders').doc(orderId).update({'isFulfilled': true});
   }
@@ -434,6 +427,11 @@ class FirestoreService {
 
   Future<void> updateOrder(String orderId, Map<String, dynamic> data) async {
     await _db.collection('orders').doc(orderId).update(data);
+  }
+
+  // ++ NEW: Marks an order as Cancelled ++
+  Future<void> cancelOrder(String orderId) {
+    return _db.collection('orders').doc(orderId).update({'status': 'Cancelled'});
   }
 
   // --- Review Methods ---
