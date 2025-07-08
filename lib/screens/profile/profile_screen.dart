@@ -9,11 +9,12 @@ import 'package:charmy_craft_studio/screens/creator/create_order_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/creator_uploads_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/manage_categories_screen.dart';
 import 'package:charmy_craft_studio/screens/creator/manage_orders_screen.dart';
+import 'package:charmy_craft_studio/screens/creator/manage_products_screen.dart'; // <-- NEW IMPORT
 import 'package:charmy_craft_studio/screens/creator/upload_product_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/my_orders_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/select_avatar_screen.dart';
 import 'package:charmy_craft_studio/screens/profile/widgets/settings_card.dart';
-import 'package:charmy_craft_studio/screens/profile/your_addresses_screen.dart'; // Import the address screen
+import 'package:charmy_craft_studio/screens/profile/your_addresses_screen.dart';
 import 'package:charmy_craft_studio/screens/upload/upload_artwork_screen.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
@@ -363,6 +364,16 @@ class ProfileScreen extends ConsumerWidget {
                                         MaterialPageRoute(
                                             builder: (_) =>
                                             const UploadProductScreen())),
+                                  ),
+                                  const Divider(height: 1),
+                                  // ++ NEW ++
+                                  SettingsCard(
+                                    icon: Icons.store_outlined,
+                                    title: 'Manage Products',
+                                    onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                            const ManageProductsScreen())),
                                   ),
                                   const Divider(height: 1),
                                   SettingsCard(

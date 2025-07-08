@@ -1,3 +1,5 @@
+// lib/models/order.dart
+
 import 'package:charmy_craft_studio/models/order_item.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -15,7 +17,8 @@ class Order {
   final String? deliveryMode;
   final String? specialNote;
   final Map<String, dynamic>? trackingDetails;
-  final String? trackingLink; // ++ NEW FIELD FOR THE TRACKING URL ++
+  final String? trackingLink;
+  final bool isFulfilled; // <-- NEW FIELD
 
   Order({
     required this.id,
@@ -31,7 +34,8 @@ class Order {
     this.deliveryMode,
     this.specialNote,
     this.trackingDetails,
-    this.trackingLink, // ++ ADDED TO CONSTRUCTOR ++
+    this.trackingLink,
+    this.isFulfilled = false, // <-- ADDED TO CONSTRUCTOR
   });
 
   Map<String, dynamic> toMap() {
@@ -50,7 +54,8 @@ class Order {
       'deliveryMode': deliveryMode,
       'specialNote': specialNote,
       'trackingDetails': trackingDetails,
-      'trackingLink': trackingLink, // ++ ADDED TO MAP ++
+      'trackingLink': trackingLink,
+      'isFulfilled': isFulfilled, // <-- ADDED TO MAP
     };
   }
 
@@ -66,16 +71,18 @@ class Order {
           OrderItem.fromMap(itemData as Map<String, dynamic>))
           .toList(),
       totalValue: (data['totalValue'] ?? 0.0).toDouble(),
-      orderPlacementDate:
-      (data['orderPlacementDate'] as Timestamp).toDate(),
+      orderPlacementDate: (data['orderPlacementDate'] as Timestamp).toDate(),
       approximateDeliveryDate:
       (data['approximateDeliveryDate'] as Timestamp?)?.toDate(),
       status: data['status'] ?? 'Pending',
       advancePaid: data['advancePaid'] ?? false,
       deliveryMode: data['deliveryMode'],
       specialNote: data['specialNote'],
-      trackingDetails: data['trackingDetails'] != null ? Map<String, dynamic>.from(data['trackingDetails']) : null,
-      trackingLink: data['trackingLink'], // ++ ADDED FROM FIRESTORE ++
+      trackingDetails: data['trackingDetails'] != null
+          ? Map<String, dynamic>.from(data['trackingDetails'])
+          : null,
+      trackingLink: data['trackingLink'],
+      isFulfilled: data['isFulfilled'] ?? false, // <-- ADDED FROM FIRESTORE
     );
   }
 }

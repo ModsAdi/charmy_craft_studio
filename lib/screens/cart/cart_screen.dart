@@ -1,13 +1,21 @@
+// lib/screens/cart/cart_screen.dart
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:charmy_craft_studio/models/address.dart';
 import 'package:charmy_craft_studio/models/cart_item.dart';
-import 'package:charmy_craft_studio/models/product.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/models/product.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
 import 'package:charmy_craft_studio/state/cart_provider.dart';
-import 'package:charmy_craft_studio/state/single_product_provider.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/state/creator_profile_provider.dart';
+import 'package:charmy_craft_studio/state/single_product_provider.dart';
+import 'package:charmy_craft_studio/state/user_provider.dart';
+import 'package:charmy_craft_studio/widgets/address_selection_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -19,7 +27,8 @@ class CartScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('My Cart', style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.bold)),
+        title: Text('My Cart',
+            style: GoogleFonts.playfairDisplay(fontWeight: FontWeight.bold)),
       ),
       body: cartAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -30,9 +39,12 @@ class CartScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey.shade300),
+                  Icon(Icons.shopping_cart_outlined,
+                      size: 100, color: Colors.grey.shade300),
                   const SizedBox(height: 16),
-                  Text('Your Cart is Empty', style: GoogleFonts.lato(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text('Your Cart is Empty',
+                      style: GoogleFonts.lato(
+                          fontSize: 22, fontWeight: FontWeight.bold)),
                 ],
               ),
             );
@@ -49,7 +61,7 @@ class CartScreen extends ConsumerWidget {
       ),
       bottomSheet: cartAsync.valueOrNull?.isEmpty ?? true
           ? null
-          : _CheckoutBar(cartTotal: cartTotal),
+          : _WhatsAppCheckoutBar(cartTotal: cartTotal),
     );
   }
 }
@@ -95,7 +107,8 @@ class _CartItemCard extends ConsumerWidget {
                   width: 80,
                   height: 80,
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                  placeholder: (context, url) =>
+                      Container(color: Colors.grey.shade200),
                   errorWidget: (context, url, error) => const Icon(Icons.error),
                 ),
               ),
@@ -104,43 +117,57 @@ class _CartItemCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(item.title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
                     fullProductAsync.when(
                       data: (product) {
-                        bool hasDiscount = product.discountedPrice != null && product.discountedPrice! < product.price;
+                        bool hasDiscount = product.discountedPrice != null &&
+                            product.discountedPrice! < product.price;
                         return Row(
                           children: [
-                            if(hasDiscount)...[
+                            if (hasDiscount) ...[
                               Text(
                                 '₹${product.price.toStringAsFixed(0)}',
-                                style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey),
+                                style: const TextStyle(
+                                    decoration: TextDecoration.lineThrough,
+                                    color: Colors.grey),
                               ),
                               const SizedBox(width: 6),
                             ],
                             Text(
                               '₹${item.price.toStringAsFixed(0)}',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.secondary, fontSize: 16),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.secondary,
+                                  fontSize: 16),
                             ),
-                            if(hasDiscount)...[
+                            if (hasDiscount) ...[
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0),
                                 child: Text(
                                   '(${product.discountPercentage}% off)',
-                                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+                                  style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12),
                                 ),
                               )
                             ]
                           ],
                         );
                       },
-                      loading: () => const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                      error: (_,__) => Text('₹${item.price.toStringAsFixed(0)}'),
+                      loading: () => const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      error: (_, __) => Text('₹${item.price.toStringAsFixed(0)}'),
                     ),
                   ],
                 ),
               ),
-              _QuantityControl(item: item, userId: userId!),
+              if (userId != null) _QuantityControl(item: item, userId: userId),
             ],
           ),
         ),
@@ -150,7 +177,7 @@ class _CartItemCard extends ConsumerWidget {
 }
 
 class _QuantityControl extends ConsumerWidget {
-  const _QuantityControl({ required this.item, required this.userId });
+  const _QuantityControl({required this.item, required this.userId});
   final CartItem item;
   final String userId;
 
@@ -168,16 +195,22 @@ class _QuantityControl extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.remove, size: 16),
             onPressed: () {
-              ref.read(firestoreServiceProvider).updateCartItemQuantity(userId, item.id, item.quantity - 1);
+              ref
+                  .read(firestoreServiceProvider)
+                  .updateCartItemQuantity(userId, item.id, item.quantity - 1);
             },
             splashRadius: 20,
             visualDensity: VisualDensity.compact,
           ),
-          Text(item.quantity.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(item.quantity.toString(),
+              style:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           IconButton(
             icon: Icon(Icons.add, size: 16, color: theme.colorScheme.secondary),
             onPressed: () {
-              ref.read(firestoreServiceProvider).updateCartItemQuantity(userId, item.id, item.quantity + 1);
+              ref
+                  .read(firestoreServiceProvider)
+                  .updateCartItemQuantity(userId, item.id, item.quantity + 1);
             },
             splashRadius: 20,
             visualDensity: VisualDensity.compact,
@@ -188,15 +221,118 @@ class _QuantityControl extends ConsumerWidget {
   }
 }
 
-class _CheckoutBar extends StatelessWidget {
+class _WhatsAppCheckoutBar extends ConsumerWidget {
   final double cartTotal;
-  const _CheckoutBar({required this.cartTotal});
+  const _WhatsAppCheckoutBar({required this.cartTotal});
+
+  void _showAddressSelectorForCart(BuildContext context, WidgetRef ref) {
+    final user = ref.read(userDataProvider).value;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to continue.')));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return AddressSelectionSheet(
+          onAddressSelected: (selectedAddress) {
+            _generateWhatsAppMessageForCart(context, ref, selectedAddress);
+          },
+        );
+      },
+    );
+  }
+
+  void _generateWhatsAppMessageForCart(
+      BuildContext context, WidgetRef ref, Address selectedAddress) async {
+    final creatorProfile = ref.read(creatorProfileProvider).value;
+    final user = ref.read(userDataProvider).value!;
+    final cartItems = ref.read(cartProvider).value ?? [];
+    final productsInCart = ref.read(cartProductsProvider).value ?? [];
+    final whatsappNumber = creatorProfile?.whatsappNumber ?? '+910000000000';
+
+    String addressString = "📍 *Shipping Address:*\n";
+    addressString += "${selectedAddress.fullName}\n";
+    addressString +=
+    "${selectedAddress.flatHouseNo}, ${selectedAddress.areaStreet}\n";
+    if (selectedAddress.landmark.isNotEmpty) {
+      addressString += "Landmark: ${selectedAddress.landmark}\n";
+    }
+    addressString +=
+    "${selectedAddress.townCity}, ${selectedAddress.state} ${selectedAddress.pincode}\n";
+    addressString += "Phone: ${selectedAddress.mobileNumber}";
+
+    String productsListString = "";
+    for (int i = 0; i < cartItems.length; i++) {
+      final item = cartItems[i];
+      final product = productsInCart.firstWhere((p) => p.id == item.id,
+          orElse: () => Product(
+              id: item.id,
+              title: item.title,
+              description: '',
+              imageUrls: [],
+              price: item.price,
+              deliveryTime: 'N/A',
+              requiresAdvance: false));
+
+      final hasDiscount = product.discountedPrice != null &&
+          product.discountedPrice! < product.price;
+
+      productsListString += "📦 *Product ${i + 1}*\n";
+      productsListString += "• *ID:* ${product.id}\n"; // Use full ID
+      productsListString += "• *Name:* ${product.title}\n";
+      productsListString += "• *Description:* ${product.description}\n";
+      productsListString +=
+      "• *Original Price:* ₹${product.price.toStringAsFixed(0)}\n";
+      if (hasDiscount) {
+        productsListString +=
+        "• *Discounted Price:* ₹${product.discountedPrice!.toStringAsFixed(0)} (${product.discountPercentage}% OFF)\n";
+      }
+      productsListString += "• *Quantity:* ${item.quantity}\n";
+      productsListString += "• *Delivery Time:* ${product.deliveryTime}\n";
+      productsListString +=
+      "• *Total:* ${item.quantity} x ₹${item.price.toStringAsFixed(0)} = ₹${(item.quantity * item.price).toStringAsFixed(0)}\n";
+      productsListString += "🔗 *Product Link:* [Product Link]\n\n";
+    }
+
+    final message = """
+Hello, I’d like to place an order. 🛍️
+
+👤 *Name:* ${user.displayName ?? 'N/A'}
+📧 *Email:* ${user.email}
+
+──────────────────────
+🧾 *Order Summary*
+──────────────────────
+🛒 *Total Products:* ${cartItems.length}
+
+$productsListString
+💰 *Total Order Value: ₹${cartTotal.toStringAsFixed(0)}*
+
+${addressString}
+""";
+
+    final url = Uri.parse(
+        "https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}");
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch WhatsApp.')));
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16.0).copyWith(bottom: MediaQuery.of(context).padding.bottom + 8),
+      padding: const EdgeInsets.all(16.0)
+          .copyWith(bottom: MediaQuery.of(context).padding.bottom + 8),
       decoration: BoxDecoration(
         color: theme.cardColor,
         boxShadow: [
@@ -215,24 +351,27 @@ class _CheckoutBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Grand Total', style: TextStyle(color: Colors.grey.shade600)),
+              Text('Grand Total',
+                  style: TextStyle(color: Colors.grey.shade600)),
               Text(
                 '₹${cartTotal.toStringAsFixed(2)}',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style:
+                const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
+            label: const Text('Buy Now'),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: theme.colorScheme.secondary,
+              padding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              backgroundColor: const Color(0xFF25D366),
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
-              // Navigate to final checkout or order summary screen
-            },
-            child: const Text('Checkout', style: TextStyle(fontSize: 16)),
+            onPressed: () => _showAddressSelectorForCart(context, ref),
           ),
         ],
       ),

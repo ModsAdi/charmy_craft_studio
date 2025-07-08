@@ -100,6 +100,19 @@ class UploadProductNotifier extends StateNotifier<UploadProductState> {
     }
   }
 
+  // ++ NEW: Method to update an existing product ++
+  Future<void> updateProduct({required Product product}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null, progress: 0.0);
+
+    try {
+      final firestoreService = _ref.read(firestoreServiceProvider);
+      await firestoreService.updateProduct(product);
+      state = const UploadProductState(isLoading: false); // Reset state on success
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
+  }
+
   void reset() {
     state = const UploadProductState();
   }

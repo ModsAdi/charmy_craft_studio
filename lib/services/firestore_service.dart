@@ -1,6 +1,9 @@
+// lib/services/firestore_service.dart
+
+import 'dart:math';
 import 'package:charmy_craft_studio/models/address.dart';
 import 'package:charmy_craft_studio/models/artwork.dart';
-import 'package:charmy_craft_studio/models/cart_item.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/models/cart_item.dart';
 import 'package:charmy_craft_studio/models/creator_profile.dart';
 import 'package:charmy_craft_studio/models/order.dart' as my_order;
 import 'package:charmy_craft_studio/models/product.dart';
@@ -87,15 +90,16 @@ class FirestoreService {
         .orderBy('title')
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) =>
-        Product.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .map((doc) => Product.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
         .toList());
   }
 
   Future<Product?> getProductById(String productId) async {
     final docSnap = await _db.collection('products').doc(productId).get();
     if (docSnap.exists) {
-      return Product.fromFirestore(docSnap as DocumentSnapshot<Map<String, dynamic>>);
+      return Product.fromFirestore(
+          docSnap as DocumentSnapshot<Map<String, dynamic>>);
     }
     return null;
   }
@@ -112,21 +116,33 @@ class FirestoreService {
         .get();
 
     return querySnapshot.docs
-        .map((doc) => Product.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .map((doc) => Product.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
         .toList();
   }
 
   Stream<Product> getProduct(String productId) {
-    return _db
-        .collection('products')
-        .doc(productId)
-        .snapshots()
-        .map((snapshot) => Product.fromFirestore(
-        snapshot as DocumentSnapshot<Map<String, dynamic>>));
+    return _db.collection('products').doc(productId).snapshots().map(
+            (snapshot) => Product.fromFirestore(
+            snapshot as DocumentSnapshot<Map<String, dynamic>>));
   }
 
-  Future<DocumentReference> addProduct(Product product) {
-    return _db.collection('products').add(product.toMap());
+  Future<DocumentReference> addProduct(Product product) async {
+    String newId;
+    while (true) {
+      // Generate a random 7-digit number as a string
+      newId = (Random().nextInt(9000000) + 1000000).toString();
+      final doc = await _db.collection('products').doc(newId).get();
+      if (!doc.exists) {
+        // If the ID is unique, break the loop
+        break;
+      }
+    }
+
+    // Create the document with the new unique ID
+    final docRef = _db.collection('products').doc(newId);
+    await docRef.set(product.toMap());
+    return docRef;
   }
 
   Future<void> updateProduct(Product product) {
@@ -135,6 +151,18 @@ class FirestoreService {
 
   Future<void> deleteProduct(String productId) {
     return _db.collection('products').doc(productId).delete();
+  }
+
+  Future<void> setProductArchivedStatus(
+      String productId, bool isArchived) async {
+    try {
+      await _db
+          .collection('products')
+          .doc(productId)
+          .update({'isArchived': isArchived});
+    } catch (e) {
+      throw Exception('Error updating archive status: $e');
+    }
   }
 
   // --- Artwork Methods ---
@@ -271,8 +299,7 @@ class FirestoreService {
           photoUrl: '',
           aboutMe: 'Tap edit to add your story!',
           socialLinks: [],
-          whatsappNumber: '+910000000000'
-      ),
+          whatsappNumber: '+910000000000'),
     );
   }
 
@@ -326,7 +353,8 @@ class FirestoreService {
         .collection('addresses')
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => Address.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .map((doc) => Address.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
         .toList());
   }
 
@@ -361,14 +389,35 @@ class FirestoreService {
     await _db.collection('orders').doc(order.id).set(order.toMap());
   }
 
+  // ++ MODIFIED: Now fetches only active, unfulfilled orders ++
   Stream<List<my_order.Order>> getAllOrders() {
     return _db
         .collection('orders')
+        .where('isFulfilled', isEqualTo: false) // <-- ADDED FILTER
         .orderBy('orderPlacementDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => my_order.Order.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .map((doc) => my_order.Order.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
         .toList());
+  }
+
+  // ++ NEW: Fetches only fulfilled orders ++
+  Stream<List<my_order.Order>> getFulfilledOrders() {
+    return _db
+        .collection('orders')
+        .where('isFulfilled', isEqualTo: true)
+        .orderBy('orderPlacementDate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => my_order.Order.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
+        .toList());
+  }
+
+  // ++ NEW: Marks an order as fulfilled ++
+  Future<void> fulfillOrder(String orderId) {
+    return _db.collection('orders').doc(orderId).update({'isFulfilled': true});
   }
 
   Stream<List<my_order.Order>> getMyOrders(String userId) {
@@ -378,7 +427,8 @@ class FirestoreService {
         .orderBy('orderPlacementDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => my_order.Order.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+        .map((doc) => my_order.Order.fromFirestore(
+        doc as DocumentSnapshot<Map<String, dynamic>>))
         .toList());
   }
 
@@ -387,8 +437,10 @@ class FirestoreService {
   }
 
   // --- Review Methods ---
-  Future<void> setReview(String productId, String userId, String userName, String userPhotoUrl, double rating, String text) async {
-    final reviewRef = _db.collection('products').doc(productId).collection('reviews').doc(userId);
+  Future<void> setReview(String productId, String userId, String userName,
+      String userPhotoUrl, double rating, String text) async {
+    final reviewRef =
+    _db.collection('products').doc(productId).collection('reviews').doc(userId);
     await reviewRef.set({
       'userName': userName,
       'userPhotoUrl': userPhotoUrl,
@@ -405,7 +457,8 @@ class FirestoreService {
         .collection('reviews')
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => ProductReview.fromFirestore(doc)).toList());
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => ProductReview.fromFirestore(doc)).toList());
   }
 
   Stream<ProductReview?> getCurrentUserReview(String productId, String userId) {
@@ -432,20 +485,20 @@ class FirestoreService {
         .delete();
   }
 
-  // ++ NEW CART METHODS ++
+  // --- Cart Methods ---
   Stream<List<CartItem>> getCartStream(String userId) {
     return _db
         .collection('users')
         .doc(userId)
         .collection('cart')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => CartItem.fromFirestore(doc))
-        .toList());
+        .map((snapshot) =>
+        snapshot.docs.map((doc) => CartItem.fromFirestore(doc)).toList());
   }
 
   Future<void> addToCart(String userId, CartItem item) async {
-    final cartRef = _db.collection('users').doc(userId).collection('cart').doc(item.id);
+    final cartRef =
+    _db.collection('users').doc(userId).collection('cart').doc(item.id);
     await cartRef.set(item.toMap(), SetOptions(merge: true));
   }
 
@@ -458,7 +511,8 @@ class FirestoreService {
         .delete();
   }
 
-  Future<void> updateCartItemQuantity(String userId, String productId, int newQuantity) async {
+  Future<void> updateCartItemQuantity(
+      String userId, String productId, int newQuantity) async {
     if (newQuantity < 1) {
       await removeFromCart(userId, productId);
     } else {
@@ -472,7 +526,8 @@ class FirestoreService {
   }
 
   Future<void> clearCart(String userId) async {
-    final cartSnapshot = await _db.collection('users').doc(userId).collection('cart').get();
+    final cartSnapshot =
+    await _db.collection('users').doc(userId).collection('cart').get();
     for (var doc in cartSnapshot.docs) {
       await doc.reference.delete();
     }

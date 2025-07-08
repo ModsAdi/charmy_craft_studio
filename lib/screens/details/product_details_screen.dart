@@ -1,18 +1,20 @@
+// lib/screens/details/product_details_screen.dart
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:charmy_craft_studio/models/address.dart';
-import 'package:charmy_craft_studio/models/cart_item.dart'; // <-- ADD THIS IMPORT
+import 'package:charmy_craft_studio/models/cart_item.dart';
 import 'package:charmy_craft_studio/models/product.dart';
 import 'package:charmy_craft_studio/models/product_review.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/screens/details/full_image_screen.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
-// import 'package:charmy_craft_studio/state/cart_provider.dart'; // <-- This is no longer needed here
 import 'package:charmy_craft_studio/state/creator_profile_provider.dart';
 import 'package:charmy_craft_studio/state/product_review_provider.dart';
 import 'package:charmy_craft_studio/state/reviews_list_provider.dart';
 import 'package:charmy_craft_studio/state/single_product_provider.dart';
 import 'package:charmy_craft_studio/state/user_provider.dart';
+import 'package:charmy_craft_studio/widgets/address_selection_sheet.dart'; // ++ NEW IMPORT
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,26 +23,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final defaultAddressProvider = StreamProvider.autoDispose<Address?>((ref) {
-  final user = ref.watch(authStateChangesProvider).value;
-  if (user == null) {
-    return Stream.value(null);
-  }
-  return ref.read(firestoreServiceProvider).getAddresses(user.uid).map((addresses) {
-    try {
-      return addresses.firstWhere((address) => address.isDefault);
-    } catch (e) {
-      return addresses.isNotEmpty ? addresses.first : null;
-    }
-  });
-});
 
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final String productId;
   const ProductDetailsScreen({super.key, required this.productId});
 
   @override
-  ConsumerState<ProductDetailsScreen> createState() => _ProductDetailsScreenState();
+  ConsumerState<ProductDetailsScreen> createState() =>
+      _ProductDetailsScreenState();
 }
 
 class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
@@ -49,67 +39,98 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   double _currentRating = 0;
   bool _isFirstLoad = true;
 
-  void _launchWhatsApp(Product product, UserModel? user) async {
-    final creatorProfile = ref.read(creatorProfileProvider).value;
-    final whatsappNumber = creatorProfile?.whatsappNumber ?? '+910000000000';
-    final defaultAddress = ref.read(defaultAddressProvider).value;
-
-    final name = user?.displayName ?? 'Customer';
-    final email = user?.email ?? 'N/A';
-    final price = product.discountedPrice ?? product.price;
-    final discountInfo = product.discountPercentage != null
-        ? "🔻 Discounted Price: ₹${product.discountedPrice!.toStringAsFixed(0)} (${product.discountPercentage}% OFF)"
-        : "";
-
-    String addressString = "📍 **Shipping Address:**\n";
-    if (defaultAddress != null) {
-      addressString += "${defaultAddress.fullName}\n";
-      addressString += "${defaultAddress.flatHouseNo}, ${defaultAddress.areaStreet}\n";
-      if (defaultAddress.landmark.isNotEmpty) {
-        addressString += "Landmark: ${defaultAddress.landmark}\n";
-      }
-      addressString += "${defaultAddress.townCity}, ${defaultAddress.state} ${defaultAddress.pincode}\n";
-      addressString += "Phone: ${defaultAddress.mobileNumber}";
-    } else {
-      addressString += "No address saved. Please add one in your profile.";
+  // This function now shows the address selection sheet
+  void _showAddressSelector(Product product, UserModel? user) {
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to continue.')));
+      return;
     }
 
-    final message = """
-Hello, I'd like to place an order.
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return AddressSelectionSheet(
+          onAddressSelected: (selectedAddress) {
+            _generateWhatsAppMessage(product, user, selectedAddress);
+          },
+        );
+      },
+    );
+  }
 
-👤 **Name:** $name
-📧 **Email:** $email
----
-🛍️ **Order Details**
-**Product ID:** ${product.id}
-**Product:** ${product.title}
----
-💰 **Pricing**
-**Price:** ₹${product.price.toStringAsFixed(0)}
-$discountInfo
-**Delivery Time:** ${product.deliveryTime}
----
-🧾 **Total Order Value: ₹${price.toStringAsFixed(0)}**
----
-$addressString
+  // This function now takes the selected address and generates the message
+  void _generateWhatsAppMessage(Product product, UserModel user, Address selectedAddress) async {
+    final creatorProfile = ref.read(creatorProfileProvider).value;
+    final whatsappNumber = creatorProfile?.whatsappNumber ?? '+910000000000';
+
+    final finalPrice = product.discountedPrice ?? product.price;
+    final hasDiscount = product.discountedPrice != null && product.discountedPrice! < product.price;
+
+    // --- Build Address String ---
+    String addressString = "📍 *Shipping Address:*\n";
+    addressString += "${selectedAddress.fullName}\n";
+    addressString += "${selectedAddress.flatHouseNo}, ${selectedAddress.areaStreet}\n";
+    if (selectedAddress.landmark.isNotEmpty) {
+      addressString += "Landmark: ${selectedAddress.landmark}\n";
+    }
+    addressString += "${selectedAddress.townCity}, ${selectedAddress.state} ${selectedAddress.pincode}\n";
+    addressString += "Phone: ${selectedAddress.mobileNumber}";
+
+    // --- Build Product String ---
+    String productString = "📦 *Product 1*\n";
+    productString += "• *ID:* ${product.id.substring(0, 8)}...\n";
+    productString += "• *Name:* ${product.title}\n";
+    productString += "• *Description:* ${product.description}\n";
+    productString += "• *Original Price:* ₹${product.price.toStringAsFixed(0)}\n";
+    if (hasDiscount) {
+      productString += "• *Discounted Price:* ₹${product.discountedPrice!.toStringAsFixed(0)} (${product.discountPercentage}% OFF)\n";
+    }
+    productString += "• *Quantity:* 1\n";
+    productString += "• *Delivery Time:* ${product.deliveryTime}\n";
+    productString += "• *Total:* 1 x ₹${finalPrice.toStringAsFixed(0)} = ₹${finalPrice.toStringAsFixed(0)}\n";
+    productString += "🔗 *Product Link:* [Product Link]\n\n";
+
+    // --- Build Final Message ---
+    final message = """
+Hello, I’d like to place an order. 🛍️
+
+👤 *Name:* ${user.displayName ?? 'N/A'}
+📧 *Email:* ${user.email}
+
+──────────────────────
+🧾 *Order Summary*
+──────────────────────
+🛒 *Total Products:* 1
+
+$productString
+💰 *Total Order Value: ₹${finalPrice.toStringAsFixed(0)}*
+
+${addressString}
 """;
 
-    final url = Uri.parse("https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}");
+    final url = Uri.parse(
+        "https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}");
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch WhatsApp.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Could not launch WhatsApp.')));
     }
   }
 
   void _submitReview(Product product, UserModel? user) {
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in to write a review.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to write a review.')));
       return;
     }
     if (_currentRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a star rating before submitting.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please select a star rating before submitting.')));
       return;
     }
     ref.read(firestoreServiceProvider).setReview(
@@ -121,7 +142,8 @@ $addressString
       _reviewController.text.trim(),
     );
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thank you for your review!')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thank you for your review!')));
   }
 
   void _deleteReview(String productId, String reviewId) {
@@ -129,12 +151,17 @@ $addressString
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Review'),
-        content: const Text('Are you sure you want to permanently delete this review?'),
+        content: const Text(
+            'Are you sure you want to permanently delete this review?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              ref.read(firestoreServiceProvider).deleteReview(productId, reviewId);
+              ref
+                  .read(firestoreServiceProvider)
+                  .deleteReview(productId, reviewId);
               Navigator.of(context).pop();
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -181,7 +208,8 @@ $addressString
                       const Divider(height: 48),
                       _buildSectionTitle('Description'),
                       const SizedBox(height: 8),
-                      Text(product.description, style: GoogleFonts.lato(fontSize: 16, height: 1.5)),
+                      Text(product.description,
+                          style: GoogleFonts.lato(fontSize: 16, height: 1.5)),
                       const Divider(height: 48),
                       _buildSectionTitle('Ratings & Reviews'),
                       const SizedBox(height: 12),
@@ -242,7 +270,8 @@ $addressString
       children: [
         Text(
           product.title,
-          style: GoogleFonts.playfairDisplay(fontSize: 36, fontWeight: FontWeight.bold),
+          style: GoogleFonts.playfairDisplay(
+              fontSize: 36, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
@@ -255,7 +284,8 @@ $addressString
 
   Widget _buildPrice(BuildContext context, Product product) {
     final theme = Theme.of(context);
-    final hasDiscount = product.discountedPrice != null && product.discountedPrice! < product.price;
+    final hasDiscount = product.discountedPrice != null &&
+        product.discountedPrice! < product.price;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -265,7 +295,8 @@ $addressString
           '₹${(product.discountedPrice ?? product.price).toStringAsFixed(0)}',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: hasDiscount ? theme.colorScheme.secondary : Colors.black87,
+            color:
+            hasDiscount ? theme.colorScheme.secondary : Colors.black87,
           ),
         ),
         if (hasDiscount)
@@ -294,12 +325,12 @@ $addressString
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, Product product, UserModel? user) {
+  Widget _buildActionButtons(
+      BuildContext context, Product product, UserModel? user) {
     return Row(
       children: [
         Expanded(
           child: ElevatedButton(
-            // ++ THIS IS THE ONLY CHANGE IN THIS FILE ++
             onPressed: () {
               final currentUser = ref.read(authStateChangesProvider).value;
               if (currentUser != null) {
@@ -310,20 +341,24 @@ $addressString
                   imageUrl: product.imageUrls.first,
                   quantity: 1,
                 );
-                ref.read(firestoreServiceProvider).addToCart(currentUser.uid, cartItem);
+                ref
+                    .read(firestoreServiceProvider)
+                    .addToCart(currentUser.uid, cartItem);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Added to cart!')),
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please log in to add items to your cart.')),
+                  const SnackBar(
+                      content: Text(
+                          'Please log in to add items to your cart.')),
                 );
               }
             },
-            // ++ END OF CHANGE ++
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textStyle:
+              const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               backgroundColor: Colors.grey.shade200,
               foregroundColor: Colors.black87,
               elevation: 0,
@@ -336,10 +371,11 @@ $addressString
           child: ElevatedButton.icon(
             icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
             label: const Text('Buy Now'),
-            onPressed: () => _launchWhatsApp(product, user),
+            onPressed: () => _showAddressSelector(product, user), // ++ UPDATED
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textStyle:
+              const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               backgroundColor: const Color(0xFF25D366),
               foregroundColor: Colors.white,
             ),
@@ -349,7 +385,8 @@ $addressString
     );
   }
 
-  Widget _buildRatingSection(Product product, AsyncValue<ProductReview?> userReviewAsync) {
+  Widget _buildRatingSection(
+      Product product, AsyncValue<ProductReview?> userReviewAsync) {
     return Row(
       children: [
         RatingBar.builder(
@@ -358,7 +395,8 @@ $addressString
           direction: Axis.horizontal,
           itemCount: 5,
           itemSize: 28.0,
-          itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+          itemBuilder: (context, _) =>
+          const Icon(Icons.star, color: Colors.amber),
           onRatingUpdate: (rating) {
             setState(() {
               _currentRating = rating;
@@ -389,7 +427,8 @@ $addressString
           maxLines: 4,
           decoration: InputDecoration(
             hintText: 'Share your experience...',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border:
+            OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         const SizedBox(height: 12),
@@ -404,7 +443,8 @@ $addressString
     );
   }
 
-  Widget _buildReviewsList(AsyncValue<List<ProductReview>> reviewsListAsync, UserModel? currentUser) {
+  Widget _buildReviewsList(
+      AsyncValue<List<ProductReview>> reviewsListAsync, UserModel? currentUser) {
     return reviewsListAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => const Text('Could not load reviews.'),
@@ -424,7 +464,9 @@ $addressString
           separatorBuilder: (context, index) => const Divider(),
           itemBuilder: (context, index) {
             final review = reviews[index];
-            final bool canDelete = currentUser != null && (currentUser.uid == review.id || currentUser.role == 'creator');
+            final bool canDelete = currentUser != null &&
+                (currentUser.uid == review.id ||
+                    currentUser.role == 'creator');
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -433,15 +475,21 @@ $addressString
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundImage: review.userPhotoUrl.isNotEmpty ? NetworkImage(review.userPhotoUrl) : null,
-                    child: review.userPhotoUrl.isEmpty ? const Icon(Icons.person) : null,
+                    backgroundImage: review.userPhotoUrl.isNotEmpty
+                        ? NetworkImage(review.userPhotoUrl)
+                        : null,
+                    child: review.userPhotoUrl.isEmpty
+                        ? const Icon(Icons.person)
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(review.userName,
+                            style:
+                            const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -449,11 +497,13 @@ $addressString
                               rating: review.rating,
                               itemCount: 5,
                               itemSize: 16.0,
-                              itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+                              itemBuilder: (context, _) =>
+                              const Icon(Icons.star, color: Colors.amber),
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              DateFormat.yMMMd().format(review.timestamp.toDate()),
+                              DateFormat.yMMMd()
+                                  .format(review.timestamp.toDate()),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -466,7 +516,8 @@ $addressString
                   if (canDelete)
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.grey),
-                      onPressed: () => _deleteReview(widget.productId, review.id),
+                      onPressed: () =>
+                          _deleteReview(widget.productId, review.id),
                       tooltip: 'Delete Review',
                     ),
                 ],

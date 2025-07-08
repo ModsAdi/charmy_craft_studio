@@ -1,6 +1,8 @@
 import 'package:charmy_craft_studio/models/cart_item.dart';
+import 'package:charmy_craft_studio/models/product.dart';
 import 'package:charmy_craft_studio/services/auth_service.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // This provider streams the user's cart directly from Firestore.
@@ -42,4 +44,20 @@ final cartTotalProvider = Provider.autoDispose<double>((ref) {
     loading: () => 0.0,
     error: (_, __) => 0.0,
   );
+});
+
+// ++ NEW: Provider to get full product details for items in the cart ++
+final cartProductsProvider = StreamProvider.autoDispose<List<Product>>((ref) {
+  final cartItems = ref.watch(cartProvider).value ?? [];
+  if (cartItems.isEmpty) {
+    return Stream.value([]);
+  }
+  final productIds = cartItems.map((item) => item.id).toList();
+
+  return FirebaseFirestore.instance
+      .collection('products')
+      .where(FieldPath.documentId, whereIn: productIds)
+      .snapshots()
+      .map((snapshot) =>
+      snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
 });

@@ -1,11 +1,12 @@
+// lib/state/create_order_provider.dart
+
 import 'package:charmy_craft_studio/models/order_item.dart';
 import 'package:charmy_craft_studio/models/product.dart';
 import 'package:charmy_craft_studio/models/user.dart';
 import 'package:charmy_craft_studio/services/firestore_service.dart';
+import 'package:charmy_craft_studio/services/order_parser_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart';
 
-@immutable
 class CreateOrderState {
   final UserModel? foundUser;
   final List<OrderItem> items;
@@ -40,15 +41,45 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   final Ref _ref;
   CreateOrderNotifier(this._ref) : super(const CreateOrderState());
 
+  Future<void> parseAndFillOrder(String message) async {
+    state = state.copyWith(isLoading: true, clearError: true, items: []);
+    final parser = _ref.read(orderParserServiceProvider);
+    final firestore = _ref.read(firestoreServiceProvider);
+
+    try {
+      final parsedData = parser.parseOrderFromString(message);
+
+      if (parsedData.email == null) {
+        throw Exception("Could not find a valid email in the message.");
+      }
+
+      final user = await firestore.getUserByEmail(parsedData.email!);
+      if (user == null) {
+        throw Exception("Customer with email '${parsedData.email}' not found.");
+      }
+
+      final orderItems =
+      await parser.convertParsedItemsToOrderItems(parsedData.parsedItems);
+      if (orderItems.isEmpty) {
+        throw Exception("Could not find any valid products in the message.");
+      }
+
+      state =
+          state.copyWith(foundUser: user, items: orderItems, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
+  }
+
   Future<void> findUserByEmail(String email) async {
     state = state.copyWith(isLoading: true, clearError: true);
-    final firestore = _ref.read(firestoreServiceProvider);
     try {
-      final user = await firestore.getUserByEmail(email);
+      final user = await _ref.read(firestoreServiceProvider).getUserByEmail(email);
       if (user != null) {
         state = state.copyWith(foundUser: user, isLoading: false);
       } else {
-        state = state.copyWith(isLoading: false, errorMessage: 'User not found.');
+        state = state.copyWith(
+            isLoading: false, errorMessage: 'No user found for that email.');
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -56,54 +87,59 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   }
 
   Future<void> addProductById(String productId) async {
-    final firestore = _ref.read(firestoreServiceProvider);
+    state = state.copyWith(isLoading: true);
     try {
-      final product = await firestore.getProductById(productId);
+      final product =
+      await _ref.read(firestoreServiceProvider).getProductById(productId);
       if (product != null) {
-        final existingIndex = state.items.indexWhere((item) => item.productId == product.id);
-        if (existingIndex != -1) {
-          // If item exists, increase quantity using the new method
-          updateItemQuantity(productId, state.items[existingIndex].quantity + 1);
+        final existingItemIndex =
+        state.items.indexWhere((item) => item.productId == productId);
+        if (existingItemIndex != -1) {
+          // If item exists, increase quantity
+          final updatedItems = List<OrderItem>.from(state.items);
+          final existingItem = updatedItems[existingItemIndex];
+          updatedItems[existingItemIndex] =
+              existingItem.copyWith(quantity: existingItem.quantity + 1);
+          state = state.copyWith(items: updatedItems, isLoading: false);
         } else {
-          // If new, add it to the list
+          // If item does not exist, add it to the list
           final newItem = OrderItem(
             productId: product.id,
             title: product.title,
-            imageUrl: product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
+            imageUrl:
+            product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
             price: product.discountedPrice ?? product.price,
             quantity: 1,
           );
-          state = state.copyWith(items: [...state.items, newItem], isLoading: false);
+          state =
+              state.copyWith(items: [...state.items, newItem], isLoading: false);
         }
       } else {
-        state = state.copyWith(isLoading: false, errorMessage: 'Product not found.');
+        state = state.copyWith(
+            isLoading: false, errorMessage: 'Product not found');
       }
-    } catch(e) {
+    } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 
-  // ++ NEW FUNCTION TO HANDLE QUANTITY CHANGES ++
   void updateItemQuantity(String productId, int newQuantity) {
-    // If quantity is zero or less, remove the item
-    if (newQuantity < 1) {
+    if (newQuantity <= 0) {
       removeItem(productId);
       return;
     }
-
-    // Otherwise, update the quantity of the specific item
     final updatedItems = state.items.map((item) {
       if (item.productId == productId) {
         return item.copyWith(quantity: newQuantity);
       }
       return item;
     }).toList();
-
     state = state.copyWith(items: updatedItems);
   }
 
   void removeItem(String productId) {
-    final updatedItems = state.items.where((item) => item.productId != productId).toList();
+    final updatedItems =
+    state.items.where((item) => item.productId != productId).toList();
     state = state.copyWith(items: updatedItems);
   }
 
@@ -112,6 +148,8 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   }
 }
 
-final createOrderProvider = StateNotifierProvider.autoDispose<CreateOrderNotifier, CreateOrderState>((ref) {
-  return CreateOrderNotifier(ref);
-});
+final createOrderProvider =
+StateNotifierProvider.autoDispose<CreateOrderNotifier, CreateOrderState>(
+        (ref) {
+      return CreateOrderNotifier(ref);
+    });

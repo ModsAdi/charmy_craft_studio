@@ -11,10 +11,11 @@ class Product {
   final double? discountedPrice;
   final int? discountPercentage;
   final DateTime? discountCountdown;
-  final String deliveryTime; // e.g., "5-7 Days"
+  final String deliveryTime;
   final bool requiresAdvance;
   final double averageRating;
   final int ratingCount;
+  final bool isArchived; // <-- NEW FIELD
 
   Product({
     required this.id,
@@ -29,6 +30,7 @@ class Product {
     required this.requiresAdvance,
     this.averageRating = 0.0,
     this.ratingCount = 0,
+    this.isArchived = false, // <-- NEW FIELD
   });
 
   // Factory to create a Product from a Firestore document
@@ -47,6 +49,7 @@ class Product {
       requiresAdvance: data['requiresAdvance'] ?? false,
       averageRating: (data['averageRating'] ?? 0.0).toDouble(),
       ratingCount: data['ratingCount'] ?? 0,
+      isArchived: data['isArchived'] ?? false, // <-- NEW FIELD
     );
   }
 
@@ -64,7 +67,7 @@ class Product {
       'requiresAdvance': requiresAdvance,
       'averageRating': averageRating,
       'ratingCount': ratingCount,
-      // 'createdAt' can be added here if needed, typically using FieldValue.serverTimestamp() on create
+      'isArchived': isArchived, // <-- NEW FIELD
     };
   }
 }
